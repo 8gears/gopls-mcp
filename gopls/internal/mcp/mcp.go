@@ -210,6 +210,7 @@ func newServer(session *cache.Session, lspServer protocol.Server) *mcp.Server {
 	for _, tool := range tools {
 		addToolByName(mcpServer, h, tool)
 	}
+
 	return mcpServer
 }
 

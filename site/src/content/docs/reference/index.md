@@ -1,0 +1,1 @@
+../../../../../gopls/mcpbridge/core/reference.md

@@ -8,3 +8,8 @@
 # See golang.org/issue/9281
 
 * -text
+
+package-lock.json linguist-generated=true
+go.sum            linguist-generated=true
+*.min.js          linguist-generated=true
+*.min.css         linguist-generated=true

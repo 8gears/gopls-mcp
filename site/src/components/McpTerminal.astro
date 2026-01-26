@@ -1,0 +1,426 @@
+---
+// src/components/McpTerminal.astro
+// Comparison View: Traditional Search vs. MCP Direct Access
+---
+
+<div class="comparison-container">
+
+  {/* --- SCENARIO HEADER --- */}
+  <div class="scenario-header">
+    <span class="scenario-label">Scenario</span>
+    <h3 class="scenario-title">Understanding <code>gin.Default()</code></h3>
+  </div>
+
+  <div class="comparison-grid">
+    
+    {/* === LEFT: TRADITIONAL / MANUAL === */}
+    <div class="workflow-pane manual-theme">
+      <div class="pane-header">
+        <div class="badge error">Without MCP</div>
+        <span class="pane-title">Manual Navigation</span>
+      </div>
+      
+      <div class="pane-content">
+        <div class="step-item">
+            <div class="step-marker">1</div>
+            <div class="step-text">Guess keyword & search codebase</div>
+        </div>
+        <div class="terminal-mock">
+            <div class="term-line"><span class="prompt">$</span> grep -r "func Default" .</div>
+            <div class="term-output">
+                ./gin.go: func Default() *Engine<br/>
+                ./mode.go: func DefaultWriter() io.Writer
+            </div>
+        </div>
+
+        <div class="step-item">
+            <div class="step-marker">2</div>
+            <div class="step-text">Locate file, open, and scroll</div>
+        </div>
+        <div class="file-mock">
+            <div class="file-tab">gin.go</div>
+            <div class="file-lines">
+               <div class="line dim">...</div>
+               <div class="line dim">func New() *Engine {'{'} ... {'}'}</div>
+               <div class="line highlight">func Default() *Engine {'{'}</div>
+               <div class="line indent">debugPrintWARNINGDefault()</div>
+               <div class="line indent">engine := New()</div>
+               <div class="line dim">...</div>
+            </div>
+        </div>
+        
+        <div class="friction-note">
+            <span class="icon">⚠️</span> High Context Switching Cost
+        </div>
+      </div>
+    </div>
+
+    {/* === CENTER: VS === */}
+    <div class="vs-divider">
+        <div class="vs-line"></div>
+        <div class="vs-text">VS</div>
+        <div class="vs-line"></div>
+    </div>
+
+    {/* === RIGHT: MCP WAY === */}
+    <div class="workflow-pane mcp-theme">
+      <div class="pane-header">
+        <div class="badge success">With gopls-mcp</div>
+        <span class="pane-title">Direct Semantic Access</span>
+      </div>
+
+      <div class="pane-content centered-content">
+        
+        {/* The Trigger */}
+        <div class="code-context">
+            <div class="context-label">Your Code</div>
+            <pre class="code-snippet">r := <span class="highlight-trigger">gin.Default()</span></pre>
+        </div>
+
+        {/* The Direct Connection */}
+        <div class="connection-visual">
+            <div class="arrow-down"></div>
+            <div class="mcp-tag">MCP: definition + implementation</div>
+        </div>
+
+        {/* The Result */}
+        <div class="result-card">
+            <div class="result-header">
+                <span class="res-title">func Default() *Engine</span>
+                <span class="res-loc">gin.go</span>
+            </div>
+            <div class="result-tabs">
+                <span class="tab active">Implementation</span>
+                <span class="tab">Doc</span>
+            </div>
+            <div class="result-body">
+<pre class="code-result">
+<span class="kwd">func</span> Default() <span class="typ">*Engine</span> {'{'}
+    <span class="cmt">// Returns an Engine with Logger </span>
+    <span class="cmt">// and Recovery middleware attached.</span>
+    <span class="var">engine</span> := New()
+    <span class="var">engine</span>.Use(Logger(), Recovery())
+    <span class="kwd">return</span> <span class="var">engine</span>
+{'}'}
+</pre>
+            </div>
+        </div>
+         <div class="efficiency-note">
+            <span class="icon">⚡</span> Zero Context Switching
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  :root {
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --bg-manual: #fff5f5;
+    --border-manual: #ffc9c9;
+    --bg-mcp: #f0fdf4;
+    --border-mcp: #bbf7d0;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+  }
+
+  .comparison-container {
+    font-family: var(--font-mono);
+    margin: 3rem 0;
+    color: var(--text-primary);
+  }
+
+  .scenario-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .scenario-label {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .scenario-title {
+    margin: 0.5rem 0 0;
+    font-size: 1.25rem;
+  }
+  .scenario-title code {
+    background: #f3f4f6;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    color: #db2777;
+  }
+
+  .comparison-grid {
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  @media (max-width: 768px) {
+    .comparison-grid {
+      flex-direction: column;
+    }
+  }
+
+  /* --- Panes --- */
+  .workflow-pane {
+    flex: 1;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .manual-theme { border-top: 4px solid #ef4444; }
+  .mcp-theme { border-top: 4px solid #10b981; }
+
+  .pane-header {
+    padding: 1rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pane-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+    text-transform: uppercase;
+  }
+  .badge.error { background: #fee2e2; color: #991b1b; }
+  .badge.success { background: #dcfce7; color: #166534; }
+
+  .pane-content {
+    padding: 1.5rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: #fff;
+  }
+
+  /* --- Manual Workflow Visuals --- */
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .step-marker {
+    width: 20px;
+    height: 20px;
+    background: #e5e7eb;
+    color: #6b7280;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+  }
+  .step-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .terminal-mock {
+    background: #1e293b;
+    color: #cbd5e1;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: monospace;
+    margin-left: 30px;
+  }
+  .term-line { margin-bottom: 6px; }
+  .prompt { color: #10b981; margin-right: 6px; }
+  .term-output { color: #94a3b8; line-height: 1.4; }
+
+  .file-mock {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-left: 30px;
+    overflow: hidden;
+  }
+  .file-tab {
+    background: #f3f4f6;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: #4b5563;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .file-lines {
+    padding: 10px;
+    font-size: 0.75rem;
+    background: #fff;
+    line-height: 1.5;
+    color: #9ca3af;
+  }
+  .line.highlight { color: #1f2937; background: #fff7ed; font-weight: bold; }
+  .line.indent { padding-left: 1rem; }
+  
+  .friction-note {
+    margin-top: auto;
+    padding-top: 1rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  /* --- VS Divider --- */
+  .vs-divider {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #d1d5db;
+  }
+  .vs-line { width: 1px; height: 100%; background: #e5e7eb; }
+  .vs-text { 
+    font-weight: 900; 
+    font-size: 0.8rem; 
+    background: #f3f4f6; 
+    padding: 4px; 
+    border-radius: 4px;
+  }
+  @media (max-width: 768px) {
+    .vs-divider { flex-direction: row; margin: 10px 0; }
+    .vs-line { width: 100%; height: 1px; }
+  }
+
+  /* --- MCP Workflow Visuals --- */
+  .centered-content {
+    align-items: center;
+  }
+
+  .code-context {
+    text-align: left;
+    width: 100%;
+    margin-bottom: 0;
+  }
+  .context-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+  .code-snippet {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #334155;
+    margin: 0;
+  }
+  .highlight-trigger {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: bold;
+    border-bottom: 2px solid #3b82f6;
+  }
+
+  .connection-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 10px 0;
+    position: relative;
+    width: 100%;
+  }
+  .arrow-down {
+    width: 2px;
+    height: 30px;
+    background: #3b82f6;
+  }
+  .mcp-tag {
+    background: #eff6ff;
+    color: #3b82f6;
+    border: 1px solid #bfdbfe;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: white;
+  }
+
+  .result-card {
+    width: 100%;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+  }
+  .result-header {
+    background: #f0fdf4;
+    padding: 8px 12px;
+    border-bottom: 1px solid #bbf7d0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .res-title { font-size: 0.8rem; font-weight: bold; color: #166534; }
+  .res-loc { font-size: 0.7rem; color: #15803d; opacity: 0.8; }
+
+  .result-tabs {
+    display: flex;
+    background: #f0fdf4;
+    padding: 0 12px;
+    gap: 12px;
+    border-bottom: 1px solid #bbf7d0;
+  }
+  .tab {
+    font-size: 0.7rem;
+    padding: 4px 0;
+    color: #15803d;
+    cursor: default;
+  }
+  .tab.active {
+    font-weight: bold;
+    border-bottom: 2px solid #166534;
+  }
+
+  .result-body {
+    background: #ffffff;
+    padding: 12px;
+    overflow-x: auto;
+  }
+  .code-result {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  /* Syntax Highlighting */
+  .kwd { color: #d73a49; }
+  .fn { color: #6f42c1; }
+  .typ { color: #005cc5; }
+  .var { color: #24292e; }
+  .cmt { color: #6a737d; font-style: italic; }
+  
+  .efficiency-note {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: #059669;
+    font-weight: 600;
+  }
+</style>

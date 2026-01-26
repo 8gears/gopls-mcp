@@ -1,0 +1,70 @@
+---
+import '../../styles/mcp-demo.css';
+---
+
+<div class="comparison-container">
+  <div class="comparison-grid">
+    {/* LEFT: MANUAL */}
+    <div class="workflow-pane manual-theme">
+      <div class="pane-header">
+        <div class="badge error">Without MCP</div>
+        <span class="pane-title">Context Switch</span>
+      </div>
+      <div class="pane-content">
+        <div class="step-item">
+          <div class="step-marker">1</div>
+          <div class="step-text">Stop coding, Go to definition</div>
+        </div>
+        <div class="file-mock" style="height: 80px;">
+           <div class="file-tab">json.go</div>
+           <div class="file-lines">
+               <div class="line dim">...</div>
+               <div class="line highlight">func Marshal(v any) ([]byte, error)</div>
+               <div class="line indent dim">/* Marshal returns the JSON... */</div>
+           </div>
+        </div>
+        <div class="step-item">
+            <div class="step-marker">2</div>
+            <div class="step-text">Read, remember, go back</div>
+        </div>
+        <div class="friction-note"><span class="icon">🧠</span> Breaks Flow State</div>
+      </div>
+    </div>
+
+    {/* VS */}
+    <div class="vs-divider">
+        <div class="vs-line"></div><div class="vs-text">VS</div><div class="vs-line"></div>
+    </div>
+
+    {/* RIGHT: MCP */}
+    <div class="workflow-pane mcp-theme">
+      <div class="pane-header">
+        <div class="badge success">With gopls-mcp</div>
+        <span class="pane-title">Inline Details</span>
+      </div>
+      <div class="pane-content">
+        <div class="code-context">
+           <div class="context-label">Hover / Query</div>
+           <pre class="code-snippet"><span class="highlight-trigger">json.Marshal</span>(data)</pre>
+        </div>
+        <div class="connection-visual">
+            <div class="arrow-down"></div>
+            <div class="mcp-pill">symbol details</div>
+        </div>
+        <div class="result-card">
+            <div class="result-header">
+                <span class="res-title">encoding/json.Marshal</span>
+            </div>
+            <div class="result-body">
+                <pre class="code-result"><span class="kwd">func</span> Marshal(v <span class="typ">any</span>) ([]<span class="typ">byte</span>, <span class="typ">error</span>)</pre>
+                <div style="font-size: 0.75rem; color: #666; margin-top: 8px; font-style: italic; border-left: 2px solid #ddd; padding-left: 8px;">
+                    Marshal returns the JSON encoding of v.<br/>
+                    Marshal traverses the value v recursively.
+                </div>
+            </div>
+        </div>
+        <div class="efficiency-note"><span class="icon">✨</span> Stay in Context</div>
+      </div>
+    </div>
+  </div>
+</div>

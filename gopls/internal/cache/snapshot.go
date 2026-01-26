@@ -1845,6 +1845,7 @@ func (s *Snapshot) clone(ctx, bgCtx context.Context, changed StateChange, done f
 	// packages directly containing the affected file, and only if it changed in
 	// a relevant way.
 	metadataUpdates := make(map[PackageID]*metadata.Package)
+
 	for id, mp := range s.meta.Packages {
 		invalidateMetadata := idsToInvalidate[id]
 
@@ -1862,6 +1863,20 @@ func (s *Snapshot) clone(ctx, bgCtx context.Context, changed StateChange, done f
 				needsReload = append(needsReload, mp.ForTest)
 			}
 			result.shouldLoad.Set(id, needsReload, nil)
+		}
+
+		// IMPORTANT: Even if invalidateMetadata is false, if the package contains
+		// a changed file (present in directIDs), we still need to reload it. This ensures
+		// that packages with changed file contents (like adding a new function)
+		// are reloaded so that tools see the updated content.
+		if !invalidateMetadata {
+			if _, ok := directIDs[id]; ok && !metadata.IsCommandLineArguments(mp.ID) {
+				needsReload := []PackagePath{mp.PkgPath}
+				if mp.ForTest != "" && mp.ForTest != mp.PkgPath {
+					needsReload = append(needsReload, mp.ForTest)
+				}
+				result.shouldLoad.Set(id, needsReload, nil)
+			}
 		}
 
 		// Check whether the metadata should be deleted.

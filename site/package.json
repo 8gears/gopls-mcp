@@ -1,0 +1,20 @@
+{
+  "name": "gopls-mcp-docs",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "predev": "node scripts/generate-reference.js",
+    "start": "astro dev",
+    "prebuild": "node scripts/generate-reference.js",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.37.4",
+    "astro": "^5.6.1",
+    "remark": "^15.0.1",
+    "remark-html": "^16.0.1"
+  }
+}

@@ -1,0 +1,57 @@
+name: gopls-mcp Tests
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'gopls/mcpbridge/**'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'gopls/mcpbridge/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        go-version: ['1.24', '1.25']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build gopls-mcp
+        run: go build -o /tmp/gopls-mcp .
+
+      - name: Run tests
+        working-directory: ./gopls/mcpbridge
+        run: go test -v ./...
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-go-${{ matrix.go-version }}
+          path: |
+            gopls/mcpbridge/test/integration/*.log
+            gopls/mcpbridge/test/e2e/*.log
+          if-no-files-found: ignore
+          retention-days: 7

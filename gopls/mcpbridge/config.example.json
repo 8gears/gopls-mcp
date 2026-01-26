@@ -1,0 +1,27 @@
+{
+  "workdir": "/path/to/your/project",
+
+  "maxResponseBytes": 400000,
+
+  "gopls": {
+    "staticcheck": true
+  },
+
+  "logging": {
+    "level": "info"
+  }
+}
+
+# USAGE EXAMPLES:
+
+# 1. Use global limit (400KB):
+#    analyze_workspace(cwd="/path/to/project")
+#
+# 2. Use larger limit for this request (1MB):
+#    analyze_workspace(cwd="/path/to/project", max_response_size=1000000)
+#
+# 3. No limit (get full response):
+#    analyze_workspace(cwd="/path/to/project", max_response_size=-1)
+#
+# NOTE: Use max_response_size with caution! Large responses may exceed
+# token limits and cause issues. Only use when you absolutely need full results.

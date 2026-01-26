@@ -1,0 +1,23 @@
+{
+  "gopls": {
+    "analyses": {
+      "unusedparams": true,
+      "unusedwrite": true,
+      "shadow": true
+    },
+    "buildFlags": ["-tags=integration"],
+    "staticcheck": true,
+    "completionBudget": "100ms",
+    "directoryFilters": ["-vendor", "-node_modules"],
+    "experimentalPostfixCompletions": true,
+    "experimentalWorkspaceModule": true,
+    "linkTarget": "pkg.go.dev",
+    "matcher": "fuzzy",
+    "semanticTokens": true,
+    "verboseOutput": false
+  },
+  "logging": {
+    "level": "info"
+  },
+  "workdir": ""
+}

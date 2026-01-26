@@ -1,0 +1,129 @@
+---
+// src/components/WorkflowComparison.astro
+// Compact version: minimal vertical space, clear contrast
+---
+
+<div class="compact-comparison">
+  
+  <div class="context-pane">
+    <div class="pane-label">Context (User Code)</div>
+    <pre class="code-snippet">func HandleRequest(c *gin.Context) {'{'}
+  c.<span class="target">Next()</span> <span class="comment">// What is this?</span>
+{'}'}</pre>
+  </div>
+
+  <div class="results-pane">
+    <!-- Traditional -->
+    <div class="result-row old">
+        <div class="method"><span class="icon">❌</span> RAG / Grep</div>
+        <div class="arrow">→</div>
+        <div class="outcome">"Next" matches 5,000+ files (Ambiguous)</div>
+    </div>
+
+    <!-- MCP -->
+    <div class="result-row new">
+        <div class="method"><span class="icon">✅</span> <strong>gopls-mcp</strong></div>
+        <div class="arrow">→</div>
+        <div class="outcome"><strong>gin.go:42</strong> <code>func (c *Context) Next()</code></div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  .compact-comparison {
+    font-family: var(--font-mono, monospace);
+    background: #fff;
+    border: 1px solid #e1e4e8;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+    display: flex;
+    overflow: hidden;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  /* Left: Code Context */
+  .context-pane {
+    background: #f6f8fa;
+    padding: 1rem;
+    border-right: 1px solid #e1e4e8;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 260px;
+  }
+  .pane-label {
+    font-size: 0.7rem;
+    color: #6a737d;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  .code-snippet {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #24292e;
+    background: transparent;
+    padding: 0;
+    border: none;
+    font-family: inherit;
+  }
+  .target {
+    background: #fffbdd;
+    border-bottom: 2px solid #ffbd2e;
+    font-weight: bold;
+    padding: 0 2px;
+  }
+  .comment { color: #6a737d; font-style: italic; }
+
+  /* Right: Results */
+  .results-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .result-row {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .result-row.old {
+    background: #fff5f5;
+    color: #586069;
+    border-bottom: 1px solid #e1e4e8;
+  }
+  .result-row.new {
+    background: #f0fff4;
+    color: #24292e;
+  }
+
+  .method {
+    min-width: 110px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .arrow { color: #959da5; }
+  .outcome { flex: 1; }
+  .outcome code {
+      background: rgba(255,255,255,0.5);
+      padding: 0.1em 0.3em;
+      border-radius: 3px;
+      margin-left: 6px;
+  }
+
+  @media (max-width: 700px) {
+    .compact-comparison { flex-direction: column; }
+    .context-pane { border-right: none; border-bottom: 1px solid #e1e4e8; width: 100%; min-width: auto;}
+    .result-row { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+    .method { min-width: auto; }
+    .arrow { display: none; } /* Hide arrow on mobile for cleaner stack */
+  }
+</style>

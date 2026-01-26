@@ -1,0 +1,68 @@
+---
+import '../../styles/mcp-demo.css';
+---
+
+<div class="comparison-container">
+  <div class="comparison-grid">
+    {/* LEFT: MANUAL */}
+    <div class="workflow-pane manual-theme">
+      <div class="pane-header">
+        <div class="badge error">Without MCP</div>
+        <span class="pane-title">Compile & Check</span>
+      </div>
+      <div class="pane-content">
+        <div class="step-item">
+          <div class="step-marker">1</div>
+          <div class="step-text">Run build command</div>
+        </div>
+        <div class="terminal-mock">
+          <div class="term-line"><span class="prompt">$</span> go build ./...</div>
+          <div class="term-output" style="color:#ef4444">
+            # myapp/api<br/>
+            ./handler.go:24:15: cannot use<br/>
+            "123" (untyped string constant)<br/>
+            as int value in argument to...
+          </div>
+        </div>
+        <div class="friction-note"><span class="icon">⏳</span> Slow Feedback Loop</div>
+      </div>
+    </div>
+
+    {/* VS */}
+    <div class="vs-divider">
+        <div class="vs-line"></div><div class="vs-text">VS</div><div class="vs-line"></div>
+    </div>
+
+    {/* RIGHT: MCP */}
+    <div class="workflow-pane mcp-theme">
+      <div class="pane-header">
+        <div class="badge success">With gopls-mcp</div>
+        <span class="pane-title">Active Diagnostics</span>
+      </div>
+      <div class="pane-content">
+        <div class="code-context">
+           <div class="context-label">Editor State</div>
+           <pre class="code-snippet">processID(<span class="highlight-error">"123"</span>)</pre>
+        </div>
+        <div class="connection-visual">
+            <div class="arrow-down"></div>
+            <div class="mcp-pill">publish diagnostics</div>
+        </div>
+        <div class="result-card" style="border-color: #fca5a5;">
+            <div class="result-header" style="background: #fef2f2; border-bottom-color: #fca5a5;">
+                <span class="res-title" style="color: #991b1b">Type Error</span>
+                <span class="res-loc">handler.go:24</span>
+            </div>
+            <div class="result-body">
+                <div style="font-size: 0.75rem; color: #b91c1c; font-family: monospace;">
+                    Incompatible types:<br/>
+                    Expected: <span class="typ">int</span><br/>
+                    Actual: <span class="typ">string</span>
+                </div>
+            </div>
+        </div>
+        <div class="efficiency-note"><span class="icon">⚡</span> Fix before compiling</div>
+      </div>
+    </div>
+  </div>
+</div>
