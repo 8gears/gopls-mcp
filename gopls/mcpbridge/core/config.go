@@ -23,9 +23,6 @@ type MCPConfig struct {
 	// }
 	Gopls map[string]any `json:"gopls"`
 
-	// Logging controls MCP server logging behavior
-	Logging *LoggingConfig `json:"logging,omitempty"`
-
 	// Workdir is the working directory for the Go project
 	// (can also be set via command-line flag)
 	Workdir string `json:"workdir,omitempty"`
@@ -34,25 +31,16 @@ type MCPConfig struct {
 	// ALL tools will respect this limit automatically to prevent oversized responses.
 	// When a response exceeds this limit, it will be truncated and include
 	// metadata indicating truncation.
-	// Default: 400000 (400KB)
-	MaxResponseBytes int `json:"maxResponseBytes,omitempty"`
-}
-
-// LoggingConfig controls logging behavior
-type LoggingConfig struct {
-	// Level is the logging level (debug, info, warn, error)
-	Level string `json:"level,omitempty"`
-
-	// File is the path to a log file (if set, logs are written here)
-	File string `json:"file,omitempty"`
+	// Default: 32000 (32KB)
+	// JSON field name: max_response_bytes
+	MaxResponseBytes int `json:"max_response_bytes,omitempty"`
 }
 
 // DefaultConfig returns a default configuration.
 func DefaultConfig() *MCPConfig {
 	return &MCPConfig{
 		Gopls:            make(map[string]any),
-		Logging:          &LoggingConfig{Level: "info"},
-		MaxResponseBytes: 400000, // 400KB
+		MaxResponseBytes: 32000, // 32KB
 	}
 }
 
@@ -73,7 +61,7 @@ func LoadConfig(data []byte) (*MCPConfig, error) {
 		config.Gopls = make(map[string]any)
 	}
 	if config.MaxResponseBytes == 0 {
-		config.MaxResponseBytes = 400000
+		config.MaxResponseBytes = 32000 // 32KB
 	}
 
 	return &config, nil

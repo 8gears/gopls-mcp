@@ -73,7 +73,7 @@ func main() {
 
 		// Start gopls-mcp
 
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"include_docs":   false,
@@ -90,7 +90,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsComprehensive)
 		t.Logf("Package symbols:\n%s", content)
 
 		// Should find the type
@@ -145,7 +145,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"include_docs":   true,
@@ -162,7 +162,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsComprehensive)
 		t.Logf("Package symbols with docs:\n%s", content)
 
 		// Should contain documentation
@@ -207,7 +207,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"include_docs":   false,
@@ -224,7 +224,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsComprehensive)
 		t.Logf("Package symbols with bodies:\n%s", content)
 
 		// Should contain function bodies
@@ -259,7 +259,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"include_docs":   false,
@@ -276,7 +276,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsComprehensive)
 		t.Logf("Empty package symbols:\n%s", content)
 
 		// Should still return a result, even if empty
@@ -306,7 +306,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "does/not/exist",
 			"include_docs":   false,
@@ -319,7 +319,7 @@ func main() {
 		if err != nil {
 			t.Logf("Expected error for non-existent package: %v", err)
 		} else if res != nil {
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsComprehensive)
 			t.Logf("Result for non-existent package: %s", content)
 
 			// If no error, should mention the issue
@@ -395,7 +395,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"include_docs":   true,
@@ -412,7 +412,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsComprehensive)
 		t.Logf("Complex type hierarchy:\n%s", content)
 
 		// Should find interface

@@ -16,8 +16,5 @@
     "semanticTokens": true,
     "verboseOutput": false
   },
-  "logging": {
-    "level": "info"
-  },
   "workdir": ""
 }

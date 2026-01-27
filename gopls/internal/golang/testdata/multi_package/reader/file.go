@@ -1,0 +1,1 @@
+package reader; import "example.com/interfaces"; type File struct { path string }; func (f *File) Read() ([]byte, error) { return []byte("hello"), nil }; var _ interfaces.Reader = (*File)(nil)

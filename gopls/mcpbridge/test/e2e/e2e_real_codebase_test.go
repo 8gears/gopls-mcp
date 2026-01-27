@@ -18,16 +18,15 @@ import (
 type realCodebaseTestCase struct {
 	name      string
 	tool      string
-	args      func(goplsMcpDir string) map[string]any
+	args      func(globalGoplsMcpDir string) map[string]any
 	assertion func(t *testing.T, content string)
-	setup     func(goplsMcpDir string) (skip bool, reason string)
+	setup     func(globalGoplsMcpDir string) (skip bool, reason string)
 }
 
 // TestRealCodebase runs comprehensive tests on the real gopls-mcp codebase
 func TestRealCodebase(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-	wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
-	handlersPath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+	wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
+	handlersPath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
 	// Helper to find line number for a function
 	findFuncLine := func(content, funcName string) int {
@@ -47,7 +46,7 @@ func TestRealCodebase(t *testing.T) {
 		{
 			name: "Definition_handleGoDefinition",
 			tool: "go_definition",
-			args: func(goplsMcpDir string) map[string]any {
+			args: func(globalGoplsMcpDir string) map[string]any {
 				defLine := findFuncLine(string(wrappersContent), "func handleGoDefinition")
 				return map[string]any{
 					"locator": map[string]any{
@@ -58,7 +57,7 @@ func TestRealCodebase(t *testing.T) {
 					},
 				}
 			},
-			setup: func(goplsMcpDir string) (bool, string) {
+			setup: func(globalGoplsMcpDir string) (bool, string) {
 				defLine := findFuncLine(string(wrappersContent), "func handleGoDefinition")
 				return defLine == 0, "Could not find handleGoDefinition function"
 			},
@@ -66,10 +65,10 @@ func TestRealCodebase(t *testing.T) {
 				if !strings.Contains(content, "gopls_wrappers.go") {
 					t.Fatalf("Expected to find definition in gopls_wrappers.go.\nGot: %s", content)
 				}
-				re := regexp.MustCompile(`gopls_wrappers\.go:(\d+):\d+`)
+				re := regexp.MustCompile(`gopls_wrappers\.go:(\d+)`)
 				matches := re.FindStringSubmatch(content)
 				if len(matches) < 2 {
-					t.Fatalf("Expected 'gopls_wrappers.go:LINE:COL' format.\nGot: %s", content)
+					t.Fatalf("Expected 'gopls_wrappers.go:LINE' format.\nGot: %s", content)
 				}
 				foundLine, _ := strconv.Atoi(matches[1])
 				t.Logf("✓ Found handleGoDefinition definition at gopls_wrappers.go:%d", foundLine)
@@ -78,7 +77,7 @@ func TestRealCodebase(t *testing.T) {
 		{
 			name: "Definition_HandlerStruct",
 			tool: "go_definition",
-			args: func(goplsMcpDir string) map[string]any {
+			args: func(globalGoplsMcpDir string) map[string]any {
 				defLine := findFuncLine(string(handlersContent), "type Handler struct")
 				return map[string]any{
 					"locator": map[string]any{
@@ -89,7 +88,7 @@ func TestRealCodebase(t *testing.T) {
 					},
 				}
 			},
-			setup: func(goplsMcpDir string) (bool, string) {
+			setup: func(globalGoplsMcpDir string) (bool, string) {
 				defLine := findFuncLine(string(handlersContent), "type Handler struct")
 				return defLine == 0, "Could not find Handler struct definition"
 			},
@@ -97,10 +96,10 @@ func TestRealCodebase(t *testing.T) {
 				if !strings.Contains(content, "handlers.go") {
 					t.Fatalf("Expected to find definition in handlers.go.\nGot: %s", content)
 				}
-				re := regexp.MustCompile(`handlers\.go:(\d+):\d+`)
+				re := regexp.MustCompile(`handlers\.go:(\d+)`)
 				matches := re.FindStringSubmatch(content)
 				if len(matches) < 2 {
-					t.Fatalf("Expected 'handlers.go:LINE:COL' format.\nGot: %s", content)
+					t.Fatalf("Expected 'handlers.go:LINE' format.\nGot: %s", content)
 				}
 				foundLine, _ := strconv.Atoi(matches[1])
 				t.Logf("✓ Found Handler type definition at handlers.go:%d", foundLine)
@@ -109,7 +108,7 @@ func TestRealCodebase(t *testing.T) {
 		{
 			name: "References_Handler",
 			tool: "go_symbol_references",
-			args: func(goplsMcpDir string) map[string]any {
+			args: func(globalGoplsMcpDir string) map[string]any {
 				defLine := findFuncLine(string(handlersContent), "type Handler struct")
 				return map[string]any{
 					"locator": map[string]any{
@@ -120,7 +119,7 @@ func TestRealCodebase(t *testing.T) {
 					},
 				}
 			},
-			setup: func(goplsMcpDir string) (bool, string) {
+			setup: func(globalGoplsMcpDir string) (bool, string) {
 				defLine := findFuncLine(string(handlersContent), "type Handler struct")
 				return defLine == 0, "Could not find Handler struct definition"
 			},
@@ -137,8 +136,8 @@ func TestRealCodebase(t *testing.T) {
 				if !strings.Contains(content, "handlers.go") {
 					t.Fatalf("Expected 'handlers.go' in references result.\nGot: %s", content)
 				}
-				if !regexp.MustCompile(`handlers\.go:\d+:\d+`).MatchString(content) {
-					t.Fatalf("Expected 'handlers.go:LINE:COL' format in result.\nGot: %s", content)
+				if !regexp.MustCompile(`handlers\.go:\d+`).MatchString(content) {
+					t.Fatalf("Expected 'handlers.go:LINE' format in result.\nGot: %s", content)
 				}
 				t.Log("✓ References properly formatted with line numbers")
 			},
@@ -151,13 +150,13 @@ func TestRealCodebase(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Check if test should be skipped
 			if tc.setup != nil {
-				if skip, reason := tc.setup(goplsMcpDir); skip {
+				if skip, reason := tc.setup(globalGoplsMcpDir); skip {
 					t.Skip(reason)
 				}
 			}
 
 			// Get args and call tool
-			args := tc.args(goplsMcpDir)
+			args := tc.args(globalGoplsMcpDir)
 			res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 				Name:      tc.tool,
 				Arguments: args,
@@ -166,7 +165,7 @@ func TestRealCodebase(t *testing.T) {
 				t.Fatalf("Failed to call %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenRealCodebase)
 			t.Logf("%s result:\n%s", tc.name, testutil.TruncateString(content, 2000))
 
 			// Run assertion
@@ -177,29 +176,7 @@ func TestRealCodebase(t *testing.T) {
 
 // TestRealCodebase_Rename tests the rename tool with realistic code
 func TestRealCodebase_Rename(t *testing.T) {
-	testCode := `package core
-
-// TestRenameFunction is a test function for rename operations
-func TestRenameFunction(x int) int {
-	return x * 2
-}
-
-// useTestRenameFunction uses the test function
-func useTestRenameFunction() {
-	// First usage
-	result := TestRenameFunction(10)
-
-	// Second usage in a different context
-	another := TestRenameFunction(20)
-
-	// Third usage
-	third := TestRenameFunction(result)
-
-	_ = result
-	_ = another
-	_ = third
-}
-`
+	testCode := testutil.ReadTestData("rename-test/test_rename.go")
 	testDir := t.TempDir()
 	testPath := filepath.Join(testDir, "test_rename.go")
 	if err := os.WriteFile(testPath, []byte(testCode), 0644); err != nil {
@@ -236,7 +213,7 @@ func useTestRenameFunction() {
 		t.Fatalf("Failed to call go_dryrun_rename_symbol: %v", err)
 	}
 
-	content := testutil.ResultText(res)
+	content := testutil.ResultText(t, res, testutil.GoldenRealCodebaseRename)
 	t.Logf("Rename result:\n%s", testutil.TruncateString(content, 2000))
 
 	// Assertions

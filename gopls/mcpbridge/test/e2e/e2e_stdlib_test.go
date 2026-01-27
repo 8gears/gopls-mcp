@@ -43,7 +43,7 @@ func TestStdlibNavigation(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibNavigation)
 		t.Logf("Definition result for fmt.Println:\n%s", content)
 
 		// Should find definition in GOROOT (Go standard library)
@@ -115,7 +115,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibNavigation)
 		t.Logf("Definition result for error type:\n%s", content)
 
 		// Should find error type definition in stdlib
@@ -154,7 +154,7 @@ func TestStdlibReferences(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibReferences)
 		t.Logf("Symbol references result for fmt.Println:\n%s", content)
 
 		// Should find references in the user's code
@@ -238,7 +238,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibReferences)
 		t.Logf("Cross-file stdlib references:\n%s", content)
 
 		// Verify the tool works even if it can't find all stdlib references
@@ -313,7 +313,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibComplexTypes)
 		t.Logf("Definition result for context:\n%s", content)
 
 		if strings.Contains(content, "Definition found") || strings.Contains(content, "context") {
@@ -342,7 +342,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibComplexTypes)
 		t.Logf("Definition result for http.ResponseWriter:\n%s", content)
 
 		if strings.Contains(content, "Definition found") || strings.Contains(content, "http") {
@@ -371,7 +371,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibComplexTypes)
 		t.Logf("Definition result for sync.WaitGroup:\n%s", content)
 
 		if strings.Contains(content, "Definition found") || strings.Contains(content, "sync") {
@@ -452,7 +452,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibInterfaces)
 		t.Logf("Definition result for io.Reader:\n%s", content)
 
 		if strings.Contains(content, "Definition found") || strings.Contains(content, "io") {
@@ -481,7 +481,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibInterfaces)
 		t.Logf("Implementation result for io.Reader:\n%s", content)
 
 		// Should find MyReader as an implementation

@@ -13,7 +13,7 @@ import (
 // TestListToolsE2E is an end-to-end test that verifies list_tools works.
 func TestListToolsE2E(t *testing.T) {
 	t.Run("ListAllTools", func(t *testing.T) {
-		tool := "list_tools"
+		tool := "go_list_tools"
 		args := map[string]any{}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -25,8 +25,10 @@ func TestListToolsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListTools)
 		t.Logf("List tools result:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Should mention the number of tools
 		if !strings.Contains(content, "18 tools") && !strings.Contains(content, "19 tools") && !strings.Contains(content, "tools for Go") {
@@ -36,7 +38,7 @@ func TestListToolsE2E(t *testing.T) {
 		// Should mention key tools
 		keyTools := []string{
 			"go_search",
-			"get_package_symbol_detail",
+			"go_get_package_symbol_detail",
 			"go_implementation",
 			"go_read_file",
 		}
@@ -49,7 +51,7 @@ func TestListToolsE2E(t *testing.T) {
 	})
 
 	t.Run("ListToolsWithSchemas", func(t *testing.T) {
-		tool := "list_tools"
+		tool := "go_list_tools"
 		args := map[string]any{
 			"includeInputSchema":  true,
 			"includeOutputSchema": true,
@@ -64,7 +66,7 @@ func TestListToolsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListTools)
 		t.Logf("List tools with schemas:\n%s", content)
 
 		// Should still work even with schema inclusion
@@ -74,7 +76,7 @@ func TestListToolsE2E(t *testing.T) {
 	})
 
 	t.Run("VerifyCategories", func(t *testing.T) {
-		tool := "list_tools"
+		tool := "go_list_tools"
 		args := map[string]any{}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -86,7 +88,7 @@ func TestListToolsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListTools)
 		t.Logf("Categories:\n%s", content)
 
 		// Should mention categories

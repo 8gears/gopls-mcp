@@ -8,34 +8,14 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"golang.org/x/tools/gopls/mcpbridge/api"
 )
 
 // applyResponseLimits checks if a response exceeds max bytes and truncates if needed.
 // This is a unified limiter that works for ALL tool responses.
-//
-// The input parameter is used to check for max_response_size field:
-// - 0 or not set: use global maxBytes
-// - negative: no limit (skip truncation)
-// - positive: use that specific limit (in bytes)
-func applyResponseLimits[In any](result *mcp.CallToolResult, input In, globalMaxBytes int, toolName string) *mcp.CallToolResult {
+// Uses the global maxBytes config only (no per-request override).
+func applyResponseLimits(result *mcp.CallToolResult, maxBytes int, toolName string) *mcp.CallToolResult {
 	if result == nil || len(result.Content) == 0 {
 		return result
-	}
-
-	// Check for per-request size limit
-	requestMaxSize := getRequestMaxSize(input)
-	var maxBytes int
-
-	if requestMaxSize < 0 {
-		// Negative means no limit - bypass truncation entirely
-		return result
-	} else if requestMaxSize > 0 {
-		// Positive value overrides global config (already in bytes)
-		maxBytes = requestMaxSize
-	} else {
-		// 0 or not set - use global config
-		maxBytes = globalMaxBytes
 	}
 
 	// Check current size
@@ -53,27 +33,6 @@ func applyResponseLimits[In any](result *mcp.CallToolResult, input In, globalMax
 	}
 
 	return result
-}
-
-// getRequestMaxSize checks if the input implements ResponseSizeSetter and returns its value.
-// Uses type assertion instead of reflection for better performance and type safety.
-//
-// Returns:
-// - 0 if not implemented or field is 0 (use global config)
-// - negative if field is negative (no limit)
-// - positive value to use as specific limit (in bytes)
-func getRequestMaxSize(input any) int {
-	if input == nil {
-		return 0
-	}
-
-	// Fast path: use type assertion (no reflection overhead)
-	if limiter, ok := input.(api.ResponseSizeSetter); ok {
-		return limiter.GetMaxResponseSize()
-	}
-
-	// If the input doesn't implement the interface, return default (use global config)
-	return 0
 }
 
 // estimateResultSize estimates the size of a result in bytes.
@@ -248,7 +207,7 @@ func addTruncationMetadata(data map[string]any, originalSize, truncatedSize int,
 // WrapWithResponseLimits is a decorator that wraps tool handlers with automatic response limiting.
 // Usage:
 //
-//	handler := WrapWithResponseLimits(handleAnalyzeWorkspace, h.config.MaxResponseBytes, "analyze_workspace")
+//	handler := WrapWithResponseLimits(handleAnalyzeWorkspace, h.config.MaxResponseBytes, "go_analyze_workspace")
 func WrapWithResponseLimits[In, Out any](
 	handler func(context.Context, *Handler, *mcp.CallToolRequest, In) (*mcp.CallToolResult, *Out, error),
 	maxBytes int,
@@ -263,7 +222,7 @@ func WrapWithResponseLimits[In, Out any](
 
 		// Apply response limits
 		if result != nil {
-			result = applyResponseLimits(result, input, maxBytes, toolName)
+			result = applyResponseLimits(result, maxBytes, toolName)
 		}
 
 		return result, output, nil

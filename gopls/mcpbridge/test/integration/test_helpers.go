@@ -85,7 +85,7 @@ func runTableDrivenTests(t *testing.T, tests map[string]testCase) {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, "")
 			t.Logf("%s output:\n%s", tc.tool, truncateString(content, 500))
 
 			// Run all assertions

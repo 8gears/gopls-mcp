@@ -37,35 +37,12 @@ go 1.21
 
 // TestGenerics_BasicFunctions tests tools on generic functions using table-driven approach
 func TestGenerics_BasicFunctions(t *testing.T) {
-	code := `package generics
-
-// Generic function with type parameter
-func First[T any](slice []T) T {
-	if len(slice) == 0 {
-		var zero T
-		return zero
-	}
-	return slice[0]
-}
-
-// Generic function with constraint
-func Max[T comparable](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// Generic function with multiple type parameters
-func Pair[T, U any](t T, u U) (T, U) {
-	return t, u
-}
-`
+	code := testutil.ReadTestData("generics/basic_functions.go")
 
 	testCases := []testCase{
 		{
 			name: "list_generic_symbols",
-			tool: "list_package_symbols",
+			tool: "go_list_package_symbols",
 			args: map[string]any{
 				"package_path":   "generics",
 				"include_docs":   true,
@@ -145,7 +122,7 @@ func Pair[T, U any](t T, u U) (T, U) {
 				t.Fatalf("Failed to call tool %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsBasicFunctions)
 			tc.assertion(t, content)
 		})
 	}
@@ -153,39 +130,12 @@ func Pair[T, U any](t T, u U) (T, U) {
 
 // TestGenerics_GenericTypes tests tools on generic types using table-driven approach
 func TestGenerics_GenericTypes(t *testing.T) {
-	code := `package generictypes
-
-// Generic struct
-type Container[T any] struct {
-	Value T
-}
-
-// Generic struct with multiple type parameters
-type Pair[T, U any] struct {
-	First  T
-	Second U
-}
-
-// Generic interface
-type Wrapper[T any] interface {
-	Wrap(T) T
-	Unwrap() T
-}
-
-// Method on generic type
-func (c Container[T]) Get() T {
-	return c.Value
-}
-
-func (c Container[T]) Set(v T) {
-	c.Value = v
-}
-`
+	code := testutil.ReadTestData("generics/generic_types.go")
 
 	testCases := []testCase{
 		{
 			name: "list_generic_types",
-			tool: "list_package_symbols",
+			tool: "go_list_package_symbols",
 			args: map[string]any{
 				"package_path":   "generictypes",
 				"include_docs":   true,
@@ -257,7 +207,7 @@ func (c Container[T]) Set(v T) {
 				t.Fatalf("Failed to call tool %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsGenericTypes)
 			tc.assertion(t, content)
 		})
 	}
@@ -265,37 +215,12 @@ func (c Container[T]) Set(v T) {
 
 // TestGenerics_TypeInference tests tools handle type inference correctly using table-driven approach
 func TestGenerics_TypeInference(t *testing.T) {
-	code := `package inference
-
-func Map[T, U any](slice []T, fn func(T) U) []U {
-	result := make([]U, len(slice))
-	for i, v := range slice {
-		result[i] = fn(v)
-	}
-	return result
-}
-
-func UseInference() {
-	// Type inference should work here
-	numbers := []int{1, 2, 3}
-	strings := Map(numbers, func(n int) string {
-		return "number"
-	})
-
-	// Explicit instantiation
-	explicit := Map[int, string](numbers, func(n int) string {
-		return "explicit"
-	})
-
-	_ = strings
-	_ = explicit
-}
-`
+	code := testutil.ReadTestData("generics/type_inference.go")
 
 	testCases := []testCase{
 		{
 			name: "list_generic_with_inference",
-			tool: "list_package_symbols",
+			tool: "go_list_package_symbols",
 			args: map[string]any{
 				"package_path":   "inference",
 				"include_docs":   true,
@@ -337,7 +262,7 @@ func UseInference() {
 				t.Fatalf("Failed to call tool %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsTypeInference)
 			tc.assertion(t, content)
 		})
 	}
@@ -345,39 +270,12 @@ func UseInference() {
 
 // TestGenerics_Constraints tests tools handle type constraints using table-driven approach
 func TestGenerics_Constraints(t *testing.T) {
-	code := `package constraints
-
-// Custom constraint using interface
-type Ordered interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
-		~float32 | ~float64 |
-		~string
-}
-
-func MaxOrdered[T Ordered](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-// Constraint with methods
-type Stringer interface {
-	String() string
-}
-
-func PrintAll[T Stringer](items []T) {
-	for _, item := range items {
-		println(item.String())
-	}
-}
-`
+	code := testutil.ReadTestData("generics/constraints.go")
 
 	testCases := []testCase{
 		{
 			name: "list_constrained_generics",
-			tool: "list_package_symbols",
+			tool: "go_list_package_symbols",
 			args: map[string]any{
 				"package_path":   "constraints",
 				"include_docs":   true,
@@ -417,7 +315,7 @@ func PrintAll[T Stringer](items []T) {
 				t.Fatalf("Failed to call tool %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsConstraints)
 			tc.assertion(t, content)
 		})
 	}
@@ -425,14 +323,12 @@ func PrintAll[T Stringer](items []T) {
 
 // TestGenerics_RealWorldUsage tests generics in real gopls-mcp codebase using table-driven approach
 func TestGenerics_RealWorldUsage(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	testCases := []testCase{
 		{
 			name: "diagnostics_on_generic_code",
 			tool: "go_diagnostics",
 			args: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				t.Logf("Diagnostics on codebase with generics:\n%s", testutil.TruncateString(content, 2000))
@@ -457,7 +353,7 @@ func TestGenerics_RealWorldUsage(t *testing.T) {
 				t.Fatalf("Failed to call tool %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsRealWorldUsage)
 			tc.assertion(t, content)
 		})
 	}
@@ -465,42 +361,12 @@ func TestGenerics_RealWorldUsage(t *testing.T) {
 
 // TestGenerics_NestedGenerics tests tools on nested generic types using table-driven approach
 func TestGenerics_NestedGenerics(t *testing.T) {
-	code := `package nested
-
-import "container/list"
-
-// Nested generic types
-type Matrix[T any] [][]T
-
-type TripleContainer[T, U, V any] struct {
-	First  Container[T]
-	Second Container[U]
-	Third  Container[V]
-}
-
-type Container[T any] struct {
-	Value T
-}
-
-// Generic function returning nested generic type
-func NestedSlice[T any](n int) [][]T {
-	return make([][]T, n)
-}
-
-func UseNested() {
-	// Nested usage
-	var m Matrix[int]
-	m = append(m, []int{1, 2, 3})
-
-	// Triple nested
-	_ = TripleContainer[int, string, bool]{}
-}
-`
+	code := testutil.ReadTestData("generics/nested.go")
 
 	testCases := []testCase{
 		{
 			name: "list_nested_generics",
-			tool: "list_package_symbols",
+			tool: "go_list_package_symbols",
 			args: map[string]any{
 				"package_path":   "nested",
 				"include_docs":   true,
@@ -540,7 +406,7 @@ func UseNested() {
 				t.Fatalf("Failed to call tool %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsNestedGenerics)
 			tc.assertion(t, content)
 		})
 	}
@@ -561,31 +427,7 @@ go 1.21
 		t.Fatalf("Failed to write go.mod: %v", err)
 	}
 
-	code := `package genericiface
-
-// Generic interface
-type Processor[T any] interface {
-	Process(T) T
-}
-
-// Multiple implementations
-type StringProcessor struct{}
-
-func (s StringProcessor) Process(str string) string {
-	return "processed: " + str
-}
-
-type IntProcessor struct{}
-
-func (i IntProcessor) Process(n int) int {
-	return n * 2
-}
-
-// Generic function using interface
-func RunProcessor[T any](p Processor[T], input T) T {
-	return p.Process(input)
-}
-`
+	code := testutil.ReadTestData("generics/interfaces.go")
 
 	if err := os.WriteFile(interfaceFile, []byte(code), 0644); err != nil {
 		t.Fatalf("Failed to write interface file: %v", err)
@@ -608,7 +450,7 @@ func RunProcessor[T any](p Processor[T], input T) T {
 			t.Fatalf("Failed to find implementations: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenGenericsGenericInterfaces)
 		t.Logf("Implementations of generic interface:\n%s", content)
 
 		// Should find StringProcessor and IntProcessor

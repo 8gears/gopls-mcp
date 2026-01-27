@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -671,10 +672,11 @@ func handleGetStarted(ctx context.Context, h *Handler, req *mcp.CallToolRequest,
 
 	// Build identity
 	identity := api.ProjectIdentity{
-		Name:      modulePath,
-		Type:      determineProjectType(view),
-		Root:      view.Root().Path(),
-		GoVersion: goVersion,
+		Name:             modulePath,
+		Type:             determineProjectType(view),
+		Root:             view.Root().Path(),
+		GoVersion:        goVersion,
+		GoRuntimeVersion: runtime.Version(),
 	}
 
 	// Add description based on project type
@@ -1508,8 +1510,12 @@ func formatGetStarted(result *api.OGetStarted) string {
 	if result.Identity.Description != "" {
 		fmt.Fprintf(&b, "  **Description:** %s\n", result.Identity.Description)
 	}
-	if result.Identity.GoVersion != "" {
-		fmt.Fprintf(&b, "  **Go Version:** %s\n", result.Identity.GoVersion)
+	if result.Identity.GoVersion != "" || result.Identity.GoRuntimeVersion != "" {
+		if result.Identity.GoRuntimeVersion != "" {
+			fmt.Fprintf(&b, "  **Go Version:** %s (runtime: %s)\n", result.Identity.GoVersion, result.Identity.GoRuntimeVersion)
+		} else {
+			fmt.Fprintf(&b, "  **Go Version:** %s\n", result.Identity.GoVersion)
+		}
 	}
 	fmt.Fprintf(&b, "  **Root:** %s\n\n", result.Identity.Root)
 

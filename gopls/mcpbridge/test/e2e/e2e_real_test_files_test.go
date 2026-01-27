@@ -15,11 +15,9 @@ import (
 
 // TestRealTestFiles_DiagnosticsOnTests tests diagnostics on actual test files
 func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("CheckE2ETestFileHealth", func(t *testing.T) {
 		// Test: Run diagnostics on the e2e test files themselves
-		e2eDir := filepath.Join(goplsMcpDir, "test", "e2e")
+		e2eDir := filepath.Join(globalGoplsMcpDir, "test", "e2e")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_diagnostics",
@@ -31,7 +29,7 @@ func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
 			t.Fatalf("Failed to run diagnostics on e2e files: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesDiagnostics)
 		t.Logf("E2E test file diagnostics:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should successfully analyze and return diagnostic information
@@ -42,7 +40,7 @@ func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
 
 	t.Run("CheckIntegrationTestFiles", func(t *testing.T) {
 		// Test: Diagnostics on integration test files
-		integrationDir := filepath.Join(goplsMcpDir, "test", "integration")
+		integrationDir := filepath.Join(globalGoplsMcpDir, "test", "integration")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_diagnostics",
@@ -54,7 +52,7 @@ func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
 			t.Fatalf("Failed to run diagnostics on integration files: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesDiagnostics)
 		t.Logf("Integration test file diagnostics:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should successfully analyze integration test files
@@ -66,8 +64,6 @@ func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
 
 // TestRealTestFiles_NavigateTestCode tests navigation within test files
 func TestRealTestFiles_NavigateTestCode(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindTestFunctions", func(t *testing.T) {
 		// Test: Search for test functions in test files
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
@@ -81,7 +77,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Fatalf("Failed to search for test functions: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenRealTestFilesNavigate)
 		t.Logf("Test function search:\n%s", resultContent)
 
 		// Should find our test functions
@@ -96,7 +92,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 
 	t.Run("JumpToTestDefinition", func(t *testing.T) {
 		// Test: Go to definition of a test function
-		e2eTestFile := filepath.Join(goplsMcpDir, "test", "e2e", "e2e_stdlib_test.go")
+		e2eTestFile := filepath.Join(globalGoplsMcpDir, "test", "e2e", "e2e_stdlib_test.go")
 
 		// Read the file to find a test function
 		content, err := os.ReadFile(e2eTestFile)
@@ -107,14 +103,19 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 		lines := strings.Split(string(content), "\n")
 		var lineNum int
 		var testName string
-		for i, line := range lines {
+			for i, line := range lines {
 			if strings.Contains(line, "func TestStdlib") {
 				lineNum = i + 1
-				// Extract function name
+				// Extract function name (stop at opening parenthesis)
 				parts := strings.Fields(line)
 				for _, p := range parts {
 					if strings.HasPrefix(p, "TestStdlib") {
-						testName = p
+						// Remove the ( and everything after it
+						if idx := strings.Index(p, "("); idx != -1 {
+							testName = p[:idx]
+						} else {
+							testName = p
+						}
 						break
 					}
 				}
@@ -126,6 +127,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Skip("Could not find TestStdlib function")
 			return
 		}
+
 
 		// Test go_definition
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
@@ -143,7 +145,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Fatalf("Failed to call go_definition: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenRealTestFilesNavigate)
 		t.Logf("Test function definition:\n%s", resultContent)
 
 		// Should find the definition (it's in the same file)
@@ -156,24 +158,22 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 
 // TestRealTestFiles_TestPackageSymbols tests listing symbols in test packages
 func TestRealTestFiles_TestPackageSymbols(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("ListE2ETestPackageSymbols", func(t *testing.T) {
 		// Test: List symbols in testutil package (has shared helpers)
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/test/testutil",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to list testutil symbols: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesPackageSymbols)
 		t.Logf("Testutil package symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find utility functions
@@ -188,19 +188,19 @@ func TestRealTestFiles_TestPackageSymbols(t *testing.T) {
 	t.Run("ListBenchmarkPackageSymbols", func(t *testing.T) {
 		// Test: List symbols in benchmark package
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/test/benchmark",
 				"include_docs":   false,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to list benchmark symbols: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesPackageSymbols)
 		t.Logf("Benchmark package symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find benchmark-related symbols
@@ -212,30 +212,9 @@ func TestRealTestFiles_TestPackageSymbols(t *testing.T) {
 
 // TestRealTestFiles_FindTestUsages tests finding where test utilities are used
 func TestRealTestFiles_FindTestUsages(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindAssertStringContainsUsage", func(t *testing.T) {
 		// Test: Find all usages of test utility function
-		testutilPath := filepath.Join(goplsMcpDir, "test", "testutil", "assertions.go")
-
-		// Get file context first
-		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "go_file_context",
-			Arguments: map[string]any{
-				"file": testutilPath,
-			},
-		})
-		if err != nil {
-			t.Fatalf("Failed to get file context: %v", err)
-		}
-
-		context := testutil.ResultText(res)
-		t.Logf("Testutil file context:\n%s", context)
-
-		// Should identify the package correctly
-		if !strings.Contains(context, "testutil") {
-			t.Error("Expected to find testutil package")
-		}
+		testutilPath := filepath.Join(globalGoplsMcpDir, "test", "testutil", "assertions.go")
 
 		// Find the line number where AssertStringContains is defined
 		content, err := os.ReadFile(testutilPath)
@@ -268,7 +247,7 @@ func TestRealTestFiles_FindTestUsages(t *testing.T) {
 			t.Fatalf("Failed to find references: %v", err)
 		}
 
-		references := testutil.ResultText(res2)
+		references := testutil.ResultText(t, res2, testutil.GoldenRealTestFilesFindTestUsages)
 		t.Logf("AssertStringContains references:\n%s", testutil.TruncateString(references, 2000))
 
 		// Should find usages across test files
@@ -289,7 +268,7 @@ func TestRealTestFiles_FindTestUsages(t *testing.T) {
 			t.Fatalf("Failed to search for globalSession: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenRealTestFilesFindTestUsages)
 		t.Logf("Search for globalSession across codebase:\n%s", testutil.TruncateString(resultContent, 2000))
 
 		// Should find usages in test files
@@ -301,14 +280,12 @@ func TestRealTestFiles_FindTestUsages(t *testing.T) {
 
 // TestRealTestFiles_WorkspaceAnalysis tests analyzing test directory structure
 func TestRealTestFiles_WorkspaceAnalysis(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("AnalyzeTestDirectory", func(t *testing.T) {
 		// Test: Analyze the test directory structure
-		testDir := filepath.Join(goplsMcpDir, "test")
+		testDir := filepath.Join(globalGoplsMcpDir, "test")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "analyze_workspace",
+			Name: "go_analyze_workspace",
 			Arguments: map[string]any{
 				"Cwd": testDir,
 			},
@@ -317,7 +294,7 @@ func TestRealTestFiles_WorkspaceAnalysis(t *testing.T) {
 			t.Fatalf("Failed to analyze test directory: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesWorkspaceAnalysis)
 		t.Logf("Test directory analysis:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should identify the test directory structure
@@ -329,7 +306,7 @@ func TestRealTestFiles_WorkspaceAnalysis(t *testing.T) {
 	t.Run("ListTestPackages", func(t *testing.T) {
 		// Test: List all packages in test directory
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_module_packages",
+			Name: "go_list_module_packages",
 			Arguments: map[string]any{
 				"module_path":      "golang.org/x/tools/gopls/mcpbridge",
 				"include_docs":     false,
@@ -342,7 +319,7 @@ func TestRealTestFiles_WorkspaceAnalysis(t *testing.T) {
 			t.Fatalf("Failed to list test packages: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesWorkspaceAnalysis)
 		t.Logf("All test packages:\n%s", testutil.TruncateString(content, 3000))
 
 		// Should find e2e, integration, benchmark, testutil, testdata packages

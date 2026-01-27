@@ -95,10 +95,6 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 	info := pkg.TypesInfo()
 
 	// Find all matching symbols with scope tracking
-	type scopeFrame struct {
-		node          ast.Node
-		enclosingFunc string
-	}
 	scopeStack := []scopeFrame{{node: pgf.File, enclosingFunc: ""}}
 
 	var candidates []ResolveNodeResult
@@ -114,18 +110,8 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 			return false
 		}
 
-		// Push current node onto scope stack
-		currentFrame := scopeFrame{node: n, enclosingFunc: scopeStack[len(scopeStack)-1].enclosingFunc}
-
-		// Update enclosing function if this is a function declaration
-		if fn, ok := n.(*ast.FuncDecl); ok {
-			if fn.Recv == nil {
-				currentFrame.enclosingFunc = fn.Name.Name
-			} else {
-				recvTypeName := getReceiverTypeName(fn.Recv)
-				currentFrame.enclosingFunc = fmt.Sprintf("(%s).%s", recvTypeName, fn.Name.Name)
-			}
-		}
+		// Update scope stack for this node
+		currentFrame := updateScopeStack(n, scopeStack)
 		scopeStack = append(scopeStack, currentFrame)
 
 		// Only process identifiers that match the symbol name
@@ -142,59 +128,12 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 			isDef = (obj != nil)
 		}
 
-		// Extract parent scope information
-		var nodeParent string
-		var nodePackage string
-		var nodeKind string
-
-		if obj != nil {
-			// Get parent from object (for methods, fields, etc.)
-			nodeParent = getParentScope(obj, scopeStack[len(scopeStack)-1].enclosingFunc)
-			nodeKind = getKindString(obj)
-		} else {
-			// No type info available - use scope stack
-			nodeParent = scopeStack[len(scopeStack)-1].enclosingFunc
-		}
-
-		// Check if this is a selector expression (e.g., fmt.Println)
-		// We need to check the parent to see if this is part of a SelectorExpr
-		if parent := scopeStack[len(scopeStack)-1].node; parent != nil {
-			if sel, ok := parent.(*ast.SelectorExpr); ok && sel.Sel == ident {
-				// This ident is the selector part of a SelectorExpr
-				if xIdent, ok := sel.X.(*ast.Ident); ok {
-					// Check if X is a package import
-					if pkgObj := info.Defs[xIdent]; pkgObj != nil {
-						if _, ok := pkgObj.(*types.PkgName); ok {
-							nodePackage = xIdent.Name
-						}
-					} else {
-						// X might be a receiver/variable
-						nodeParent = xIdent.Name
-					}
-				}
-			}
-		}
+		// Extract parent scope and kind information
+		parentInfo := extractNodeParentAndKind(ident, obj, scopeStack)
 
 		// Apply filters
-		// 1. Package name filter
-		if locator.PackageName != "" && nodePackage != "" && nodePackage != locator.PackageName {
+		if !matchesLocatorFilters(locator, parentInfo.parent, parentInfo.kind).passed {
 			return true
-		}
-
-		// 2. Parent scope filter
-		if locator.ParentScope != "" {
-			// Support both "FuncName" and "(Receiver).FuncName" formats
-			if !strings.Contains(nodeParent, locator.ParentScope) &&
-				!strings.Contains(locator.ParentScope, nodeParent) {
-				return true
-			}
-		}
-
-		// 3. Kind filter
-		if locator.Kind != "" && nodeKind != "" {
-			if !normalizeKindMatches(nodeKind, locator.Kind) {
-				return true
-			}
 		}
 
 		// Found a match!
@@ -207,25 +146,7 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 		}
 
 		candidates = append(candidates, candidate)
-
-		// Use line hint to pick the best match
-		if locator.LineHint > 0 {
-			pos := pgf.Tok.Position(ident.Pos())
-			line := pos.Line
-
-			// Calculate confidence score based on line proximity
-			distance := abs(line - int(locator.LineHint))
-			confidence := 1.0 / float64(distance+1)
-
-			if bestCandidate == nil || confidence > calculateCandidateConfidence(bestCandidate, pgf, locator) {
-				bestCandidate = &candidate
-			}
-		} else {
-			// No line hint, prefer definitions over references
-			if bestCandidate == nil || (isDef && !bestCandidate.IsDefinition) {
-				bestCandidate = &candidate
-			}
-		}
+		bestCandidate = selectBestCandidate(bestCandidate, &candidate, pgf, locator, isDef)
 
 		return true
 	})
@@ -250,32 +171,6 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 //   - Find all implementations of an interface method
 //   - Discover type hierarchies in the codebase
 //
-// Parameters:
-//
-//	ctx - Context for cancellation
-//	snapshot - gopls snapshot for type checking
-//	locator - SymbolLocator with symbol_name, context_file, and optional filters
-//	          * symbol_name: The method or type name to find implementations for
-//	          * context_file: Absolute path to file where symbol is defined/used
-//	          * parent_scope: For methods, the interface name (e.g., "Writer")
-//	          * kind: Optional filter ("interface", "method", "struct")
-//
-// Returns:
-//
-//	[]SourceContext - Rich information about each implementation:
-//	  * File: Absolute path to implementation file
-//	  * StartLine/EndLine: Line range (columns removed for cleaner output)
-//	  * Symbol: Implementing type or method name
-//	  * Kind: Symbol kind ("struct", "interface", "method", etc.)
-//	  * Signature: Full signature (e.g., "func (f *File) Write(p []byte) error")
-//	  * DocComment: Documentation if available
-//	  * Snippet: Full code body (HERO field - zero-RTT access)
-//	error - Error if:
-//	  * Symbol not found in context file
-//	  * File cannot be read
-//	  * No type information available
-//	  * Context file is not part of the workspace
-//
 // Limitations:
 //   - Only finds implementations of interfaces defined in the codebase
 //   - Does NOT work with standard library interfaces (io.Reader, error, fmt.Stringer, etc.)
@@ -284,108 +179,209 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 //
 // Example - Find implementations of Writer interface:
 //
-//	locator := api.SymbolLocator{
-//	    SymbolName:  "Write",
-//	    ParentScope: "Writer",  // interface name
-//	    Kind:        "method",
-//	    ContextFile: "/path/to/interfaces.go",
-//	}
-//	impls, err := golang.LLMImplementation(ctx, snapshot, locator)
-//	// Returns: File, FileWriter, ConsoleWriter, etc.
+//	    locator := api.SymbolLocator{
+//	        SymbolName:  "Write",
+//	        ParentScope: "Writer",  // interface name
+//	        Kind:        "method",
+//	        ContextFile: "/path/to/interfaces.go",
+//	    }
+//	    impls, err := golang.LLMImplementation(ctx, snapshot, locator)
+//	    // Returns: File, FileWriter, ConsoleWriter, etc.
 //
 // Example - Find what interfaces a type implements:
 //
-//	locator := api.SymbolLocator{
-//	    SymbolName:  "FileWriter",
-//	    Kind:        "struct",
-//	    ContextFile: "/path/to/file.go",
-//	}
-//	impls, err := golang.LLMImplementation(ctx, snapshot, locator)
-//	// Returns: Writer, io.Closer, etc.
+//	    locator := api.SymbolLocator{
+//	        SymbolName:  "FileWriter",
+//	        Kind:        "struct",
+//	        ContextFile: "/path/to/file.go",
+//	    }
+//	    impls, err := golang.LLMImplementation(ctx, snapshot, locator)
+//	    // Returns: Writer, io.Closer, etc.
 //
 // This bypasses the LSP protocol layer and works directly with gopls internals,
 // making it faster and more accurate than text-based search.
 func LLMImplementation(ctx context.Context, snapshot *cache.Snapshot, locator api.SymbolLocator) ([]SourceContext, error) {
-	// First, resolve the node to get the types.Object
-	fh, err := snapshot.ReadFile(ctx, protocol.URIFromPath(locator.ContextFile))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	result, err := ResolveNode(ctx, snapshot, fh, locator)
+	// Use the unified ResolveSymbol function with default options (include docs and bodies)
+	info, err := ResolveSymbol(ctx, snapshot, locator, ResolveOptions{
+		FindImplementations: true,
+		IncludeDocs:         true,
+		IncludeBodies:       true,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if result.Object == nil {
-		return nil, fmt.Errorf("symbol '%s' has no type information", locator.SymbolName)
-	}
+	return info.Implementations, nil
+}
 
-	// Get the package for this file
-	pkg, pgf, err := NarrowestPackageForFile(ctx, snapshot, fh.URI())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get package: %w", err)
-	}
+// ===== Helper Functions for ResolveNode =====
+// These functions are extracted from ResolveNode for better testability.
 
-	// Build a cursor from the resolved position
-	cur, ok := pgf.Cursor().FindByPos(result.Pos, result.Pos)
-	if !ok {
-		return nil, fmt.Errorf("failed to create cursor for position")
-	}
+// scopeFrame represents a frame in the scope stack during AST traversal.
+type scopeFrame struct {
+	node          ast.Node
+	enclosingFunc string
+}
 
-	// Use the internal implementations logic
-	var implementations []SourceContext
+// updateScopeStack updates the scope stack for the given node.
+// It returns the updated frame that should be pushed onto the stack.
+func updateScopeStack(n ast.Node, currentStack []scopeFrame) scopeFrame {
+	currentFrame := scopeFrame{node: n, enclosingFunc: currentStack[len(currentStack)-1].enclosingFunc}
 
-	// relation=0 means infer direction (Supertypes/Subtypes) from concreteness
-	const relation = methodsets.TypeRelation(0)
-
-	err = implementationsMsets(ctx, snapshot, pkg, cur, relation, func(_ metadata.PackagePath, _ string, _ bool, loc protocol.Location) {
-		// Get symbol information from the package containing the implementation
-		implPkg, implPgf, err := NarrowestPackageForFile(ctx, snapshot, loc.URI)
-		if err != nil {
-			// Fallback to minimal source context
-			implementations = append(implementations, sourceContextFromLocation(snapshot, loc))
-			return
-		}
-
-		// Find the identifier at the implementation location
-		implIdent := findIdentifierAtPos(implPgf, loc.Range.Start.Line, loc.Range.Start.Character)
-		if implIdent == nil {
-			implementations = append(implementations, sourceContextFromLocation(snapshot, loc))
-			return
-		}
-
-		// Get the types.Object for this identifier
-		implObj := implPkg.TypesInfo().Defs[implIdent]
-		if implObj == nil {
-			implObj = implPkg.TypesInfo().Uses[implIdent]
-		}
-
-		// Find the AST node for this implementation (contains doc comment)
-		implNode := findNodeAtPos(implPgf, loc.Range.Start.Line, loc.Range.Start.Character)
-
-		// Build rich source context if we have both object and node
-		if implObj != nil && implNode != nil {
-			srcCtx := buildSourceContext(implPkg.FileSet(), implObj, implNode)
-			implementations = append(implementations, srcCtx)
+	// Update enclosing scope if this is a function declaration
+	if fn, ok := n.(*ast.FuncDecl); ok {
+		if fn.Recv == nil {
+			currentFrame.enclosingFunc = fn.Name.Name
 		} else {
-			// Fallback to minimal source context
-			srcCtx := sourceContextFromLocation(snapshot, loc)
-			srcCtx.Symbol = implIdent.Name
-			if implObj != nil {
-				srcCtx.Signature = formatObjectString(implObj)
-			}
-			implementations = append(implementations, srcCtx)
+			recvTypeName := getReceiverTypeName(fn.Recv)
+			currentFrame.enclosingFunc = fmt.Sprintf("(%s).%s", recvTypeName, fn.Name.Name)
 		}
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to find implementations: %w", err)
 	}
 
-	return implementations, nil
+	// Update enclosing scope if this is a type declaration (struct/interface)
+	// This allows us to correctly resolve fields within their parent type
+	if spec, ok := n.(*ast.TypeSpec); ok {
+		currentFrame.enclosingFunc = spec.Name.Name
+	}
+
+	return currentFrame
+}
+
+// nodeParentInfo contains the extracted parent scope and kind information for a node.
+type nodeParentInfo struct {
+	parent string
+	kind   string
+}
+
+// extractNodeParentAndKind extracts the parent scope and kind for a given identifier.
+// It uses both type information and AST structure to determine the parent.
+func extractNodeParentAndKind(ident *ast.Ident, obj types.Object, currentStack []scopeFrame) nodeParentInfo {
+	var nodeParent string
+	var nodeKind string
+
+	if obj != nil {
+		// Get parent from object (for methods, fields, etc.)
+		nodeParent = getParentScope(obj, currentStack[len(currentStack)-1].enclosingFunc)
+		nodeKind = getKindString(obj)
+	} else {
+		// No type info available - use scope stack
+		nodeParent = currentStack[len(currentStack)-1].enclosingFunc
+	}
+
+	// Check if this is a selector expression (e.g., fmt.Println)
+	// We need to check the parent to see if this is part of a SelectorExpr
+	if parent := currentStack[len(currentStack)-1].node; parent != nil {
+		if sel, ok := parent.(*ast.SelectorExpr); ok && sel.Sel == ident {
+			// This ident is the selector part of a SelectorExpr
+			// Extract the base identifier, handling nested selectors
+			nodeParent = extractSelector(sel.X)
+		}
+	}
+
+	return nodeParentInfo{parent: nodeParent, kind: nodeKind}
+}
+
+// filterResult indicates whether a node passed all filters and why it didn't.
+type filterResult struct {
+	passed bool
+	reason string
+}
+
+// matchesLocatorFilters checks if a node matches all the filters specified in the locator.
+func matchesLocatorFilters(locator api.SymbolLocator, nodeParent, nodeKind string) filterResult {
+	// Parent scope filter
+	if locator.ParentScope != "" {
+		normalizeParent := func(s string) string {
+			return strings.TrimPrefix(s, "*")
+		}
+		if normalizeParent(nodeParent) != normalizeParent(locator.ParentScope) {
+			return filterResult{false, "parent scope mismatch"}
+		}
+	}
+
+	// Kind filter
+	if locator.Kind != "" && nodeKind != "" {
+		if !normalizeKindMatches(nodeKind, locator.Kind) {
+			return filterResult{false, "kind mismatch"}
+		}
+	}
+
+	return filterResult{passed: true}
+}
+
+// candidateScore represents the score of a candidate for selection.
+type candidateScore struct {
+	candidate   *ResolveNodeResult
+	confidence  float64
+	isDefinition bool
+}
+
+// scoreCandidate calculates a score for a candidate based on the locator's preferences.
+func scoreCandidate(candidate ResolveNodeResult, pgf *parsego.File, locator api.SymbolLocator) candidateScore {
+	score := candidateScore{
+		candidate:   &candidate,
+		isDefinition: candidate.IsDefinition,
+	}
+
+	if locator.LineHint > 0 {
+		pos := pgf.Tok.Position(candidate.Pos)
+		line := pos.Line
+		distance := abs(line - int(locator.LineHint))
+		score.confidence = 1.0 / float64(distance+1)
+	} else {
+		score.confidence = 0.5 // Default confidence when no line hint
+	}
+
+	return score
+}
+
+// selectBestCandidate selects the best candidate from the current best and a new candidate.
+func selectBestCandidate(current, new *ResolveNodeResult, pgf *parsego.File, locator api.SymbolLocator, newIsDef bool) *ResolveNodeResult {
+	if current == nil {
+		return new
+	}
+
+	if locator.LineHint > 0 {
+		// Use line hint to pick the best match
+		newScore := scoreCandidate(*new, pgf, locator)
+		currentScore := scoreCandidate(*current, pgf, locator)
+
+		if newScore.confidence > currentScore.confidence {
+			return new
+		}
+		return current
+	}
+
+	// No line hint, prefer definitions over references
+	if newIsDef && !current.IsDefinition {
+		return new
+	}
+
+	return current
 }
 
 // Helper functions
+
+// extractSelector extracts the base identifier from a selector expression.
+// For example:
+//   - "fmt.Println" -> "fmt"
+//   - "pkg.subpkg.Symbol" -> "pkg"
+//   - "x.y.Symbol" -> "x"
+// This handles nested selectors by recursively extracting the leftmost identifier.
+func extractSelector(expr ast.Expr) string {
+	switch expr := expr.(type) {
+	case *ast.Ident:
+		return expr.Name
+	case *ast.SelectorExpr:
+		// Recursively extract from the left side of the selector
+		return extractSelector(expr.X)
+	case *ast.ParenExpr:
+		// Handle parenthesized expressions: (*ptr).Method
+		return extractSelector(expr.X)
+	default:
+		return ""
+	}
+}
 
 // getReceiverTypeName extracts the receiver type name from a receiver field list
 func getReceiverTypeName(recv *ast.FieldList) string {
@@ -402,7 +398,10 @@ func getReceiverTypeName(recv *ast.FieldList) string {
 	case *ast.Ident:
 		return t.Name
 	case *ast.IndexExpr, *ast.IndexListExpr:
-		// Generic types - skip for now
+		// TODO: Support generic receivers (e.g., Map[K, V])
+		// Currently returns empty string, which will cause parent scope filtering to fail
+		// for methods on generic types. To fix this, we need to extract the base type name
+		// from the index expression (e.g., "Map" from "Map[K, V]").
 		return ""
 	}
 	return ""
@@ -430,10 +429,10 @@ func getParentScope(obj types.Object, enclosingFunc string) string {
 
 	// Check if it's a field
 	if v, ok := obj.(*types.Var); ok && v.IsField() {
-		named := getNamedType(v.Type())
-		if named != nil {
-			return named.Obj().Name()
-		}
+		// The scopeStack now tracks TypeSpec nodes, so enclosingFunc
+		// will contain the struct/interface name for fields.
+		// Example: type Server struct { port int } -> enclosingFunc = "Server"
+		return enclosingFunc
 	}
 
 	return enclosingFunc
@@ -489,18 +488,6 @@ func normalizeKind(kind string) string {
 	default:
 		return kind
 	}
-}
-
-// calculateCandidateConfidence calculates a confidence score for a candidate
-func calculateCandidateConfidence(candidate *ResolveNodeResult, pgf *parsego.File, locator api.SymbolLocator) float64 {
-	pos := pgf.Tok.Position(candidate.Pos)
-	line := pos.Line
-
-	if locator.LineHint > 0 {
-		distance := abs(line - int(locator.LineHint))
-		return 1.0 / float64(distance+1)
-	}
-	return 0.5
 }
 
 func abs(x int) int {
@@ -926,7 +913,229 @@ func LLMRename(ctx context.Context, snapshot *cache.Snapshot, locator api.Symbol
 	return unifiedDiff, lineChanges, nil
 }
 
-// generateUnifiedDiff converts DocumentChange results to a unified diff format.
+// ===== Symbol Resolution Infrastructure =====
+// This section provides unified symbol resolution infrastructure.
+// All symbol-based operations (definition, implementations, references, etc.)
+// go through ResolveSymbol, making the logic easy to test and extend.
+
+// SymbolInfo contains comprehensive information about a symbol lookup.
+// Different operations populate different fields.
+type SymbolInfo struct {
+	// Locations contains all definition locations for the symbol.
+	// For most symbols, this is a single location. For interface methods,
+	// there may be multiple locations (all concrete implementations).
+	Locations []protocol.Location `json:"locations"`
+
+	// Implementations contains all implementations (if this is an interface)
+	// or all interfaces (if this is a concrete type).
+	// Populated when Options.FindImplementations = true.
+	Implementations []SourceContext `json:"implementations,omitempty"`
+
+	// Definition contains the full symbol information at its definition location.
+	// Populated when Options.IncludeDefinition = true.
+	Definition *SourceContext `json:"definition,omitempty"`
+
+	// References contains all usage locations for this symbol.
+	// Populated when Options.FindReferences = true.
+	References []SourceContext `json:"references,omitempty"`
+}
+
+// ResolveOptions controls what information is fetched during symbol resolution.
+// By default, only the minimal required data is fetched to avoid expensive operations.
+type ResolveOptions struct {
+	// FindDefinitions fetches all definition locations for the symbol.
+	// Default: true (most operations need to know where the symbol is defined)
+	FindDefinitions bool `json:"find_definitions"`
+
+	// FindImplementations finds all implementations (for interfaces) or
+	// all implemented interfaces (for concrete types).
+	// This uses the internal methodsets package and can be expensive.
+	// Default: false
+	FindImplementations bool `json:"find_implementations"`
+
+	// IncludeDefinition populates the Definition field with rich symbol
+	// information (signature, documentation, snippet) from the primary definition.
+	// Default: false
+	IncludeDefinition bool `json:"include_definition"`
+
+	// IncludeBodies includes function/method bodies in implementation results.
+	// Only used when FindImplementations = true.
+	// Default: false
+	IncludeBodies bool `json:"include_bodies"`
+
+	// IncludeDocs includes documentation comments in implementation results.
+	// Only used when FindImplementations = true.
+	// Default: false
+	IncludeDocs bool `json:"include_docs"`
+}
+
+// ResolveSymbol is the unified entry point for all symbol-based operations.
+//
+// It resolves a SymbolLocator to concrete symbol information and optionally:
+// - Finds all definition locations
+// - Finds all implementations (for interfaces) or interfaces (for types)
+// - Finds all references (future)
+//
+// This function centralizes all symbol resolution logic, making it easier to:
+// - Test: One function to test with different options
+// - Extend: Add new operations (references, callers, etc.) without duplicating resolution logic
+// - Optimize: Cache results, batch operations, etc.
+//
+// Example - Find where a symbol is defined:
+//
+//	info, err := golang.ResolveSymbol(ctx, snapshot, locator, golang.ResolveOptions{
+//	    FindDefinitions: true,
+//	})
+//	for _, loc := range info.Locations {
+//	    fmt.Printf("Defined at %s:%d\n", loc.URI.Path(), loc.Range.Start.Line)
+//	}
+//
+// Example - Find all implementations of an interface:
+//
+//	info, err := golang.ResolveSymbol(ctx, snapshot, locator, golang.ResolveOptions{
+//	    FindImplementations: true,
+//	    IncludeDocs: true,
+//	})
+//	for _, impl := range info.Implementations {
+//	    fmt.Printf("- %s: %s\n", impl.Symbol, impl.Signature)
+//	}
+func ResolveSymbol(ctx context.Context, snapshot *cache.Snapshot, locator api.SymbolLocator, options ResolveOptions) (*SymbolInfo, error) {
+	info := &SymbolInfo{}
+
+	// Default: always find definitions (it's fast and most operations need it)
+	if !options.FindDefinitions && !options.FindImplementations {
+		return info, fmt.Errorf("at least one of FindDefinitions or FindImplementations must be true")
+	}
+
+	// Step 1: Resolve the locator to get the symbol position
+	fh, err := snapshot.ReadFile(ctx, protocol.URIFromPath(locator.ContextFile))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	result, err := ResolveNode(ctx, snapshot, fh, locator)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve symbol: %w", err)
+	}
+
+	if result.Object == nil {
+		return nil, fmt.Errorf("symbol '%s' has no type information", locator.SymbolName)
+	}
+
+	// Step 2: Get package and position for gopls operations
+	pkg, pgf, err := NarrowestPackageForFile(ctx, snapshot, fh.URI())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get package: %w", err)
+	}
+
+	posn := pkg.FileSet().Position(result.Pos)
+	if !posn.IsValid() {
+		return nil, fmt.Errorf("invalid position for symbol '%s'", locator.SymbolName)
+	}
+
+	position := protocol.Position{
+		Line:      uint32(posn.Line - 1),
+		Character: uint32(posn.Column - 1),
+	}
+
+	// Step 3: Find definitions (if requested)
+	if options.FindDefinitions {
+		locations, err := Definition(ctx, snapshot, fh, position)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find definitions: %w", err)
+		}
+		info.Locations = locations
+
+		// Optionally include definition details
+		if options.IncludeDefinition && len(locations) > 0 {
+			// Get the primary definition location
+			defLoc := locations[0]
+			srcCtx := sourceContextFromLocation(snapshot, defLoc)
+
+			// Enhance with object information
+			if result.Object != nil {
+				srcCtx.Signature = formatObjectString(result.Object)
+				srcCtx.Kind = getKindFromObject(result.Object)
+			}
+
+			info.Definition = &srcCtx
+		}
+	}
+
+	// Step 4: Find implementations (if requested)
+	if options.FindImplementations {
+		// Build a cursor from the resolved position
+		cur, ok := pgf.Cursor().FindByPos(result.Pos, result.Pos)
+		if !ok {
+			return info, fmt.Errorf("failed to create cursor for position")
+		}
+
+		// Use the internal implementations logic
+		const relation = methodsets.TypeRelation(0) // infer direction
+
+		err = implementationsMsets(ctx, snapshot, pkg, cur, relation, func(_ metadata.PackagePath, _ string, _ bool, loc protocol.Location) {
+			// Get symbol information from the package containing the implementation
+			implPkg, implPgf, err := NarrowestPackageForFile(ctx, snapshot, loc.URI)
+			if err != nil {
+				// Fallback to minimal source context
+				info.Implementations = append(info.Implementations, sourceContextFromLocation(snapshot, loc))
+				return
+			}
+
+			// Find the identifier at the implementation location
+			implIdent := findIdentifierAtPos(implPgf, loc.Range.Start.Line, loc.Range.Start.Character)
+			if implIdent == nil {
+				info.Implementations = append(info.Implementations, sourceContextFromLocation(snapshot, loc))
+				return
+			}
+
+			// Get the types.Object for this identifier
+			implObj := implPkg.TypesInfo().Defs[implIdent]
+			if implObj == nil {
+				implObj = implPkg.TypesInfo().Uses[implIdent]
+			}
+
+			// Find the AST node for this implementation (contains doc comment)
+			implNode := findNodeAtPos(implPgf, loc.Range.Start.Line, loc.Range.Start.Character)
+
+			// Build rich source context if we have both object and node
+			if implObj != nil && implNode != nil {
+				srcCtx := buildSourceContext(pkg.FileSet(), implObj, implNode)
+				info.Implementations = append(info.Implementations, srcCtx)
+			} else {
+				// Fallback to minimal source context
+				srcCtx := sourceContextFromLocation(snapshot, loc)
+				srcCtx.Symbol = implIdent.Name
+				if implObj != nil {
+					srcCtx.Signature = formatObjectString(implObj)
+				}
+				info.Implementations = append(info.Implementations, srcCtx)
+			}
+		})
+		if err != nil {
+			return info, fmt.Errorf("failed to find implementations: %w", err)
+		}
+
+		// Filter implementations if bodies/docs were not requested
+		if !options.IncludeBodies || !options.IncludeDocs {
+			filtered := make([]SourceContext, 0, len(info.Implementations))
+			for _, impl := range info.Implementations {
+				if !options.IncludeBodies {
+					impl.Snippet = ""
+				}
+				if !options.IncludeDocs {
+					impl.DocComment = ""
+				}
+				filtered = append(filtered, impl)
+			}
+			info.Implementations = filtered
+		}
+	}
+
+	return info, nil
+}
+
+// GoDefinition finds the definition location(s) for a symbol identified by a SymbolLocator.
 func generateUnifiedDiff(ctx context.Context, snapshot *cache.Snapshot, changes []protocol.DocumentChange) (string, error) {
 	var diff strings.Builder
 
@@ -1276,9 +1485,18 @@ func generateHunks(origLines, modLines []string) []hunk {
 	return hunks
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
+// GoDefinition finds the definition location(s) for a symbol identified by a SymbolLocator.
+//
+// This is a convenience wrapper around ResolveSymbol that only returns definition locations.
+// For more detailed information including documentation and snippets, use ResolveSymbol directly.
+func GoDefinition(ctx context.Context, snapshot *cache.Snapshot, locator api.SymbolLocator) ([]protocol.Location, error) {
+	// Use the unified ResolveSymbol function
+	info, err := ResolveSymbol(ctx, snapshot, locator, ResolveOptions{
+		FindDefinitions: true,
+	})
+	if err != nil {
+		return nil, err
 	}
-	return b
+
+	return info.Locations, nil
 }

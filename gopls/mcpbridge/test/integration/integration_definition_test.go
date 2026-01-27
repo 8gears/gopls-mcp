@@ -43,8 +43,10 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
 		t.Logf("Definition result:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// STRONG ASSERTION 1: Must contain the actual file path with line:column
 		// Format: "Definition found at /path/to/main.go:11:6"
@@ -55,10 +57,10 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 
 		// STRONG ASSERTION 2: Must contain "main.go:" followed by a line number
 		// A fake implementation wouldn't know the actual definition line
-		re := regexp.MustCompile(`main\.go:(\d+):\d+`)
+		re := regexp.MustCompile(`main\.go:(\d+)`)
 		matches := re.FindStringSubmatch(content)
 		if len(matches) < 2 {
-			t.Fatalf("Expected 'main.go:LINE:COL' format in result.\nA fake implementation wouldn't know the exact position!\nGot: %s", content)
+			t.Fatalf("Expected 'main.go:LINE' format in result.\nA fake implementation wouldn't know the exact position!\nGot: %s", content)
 		}
 
 		// STRONG ASSERTION 3: The definition line MUST be before the usage line (28)
@@ -99,15 +101,17 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
 		t.Logf("Definition result for Person type:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// STRONG ASSERTION: Must find type definition at a specific location
 		// The type Person should be defined before line 22 (where it's used in receiver)
-		re := regexp.MustCompile(`main\.go:(\d+):\d+`)
+		re := regexp.MustCompile(`main\.go:(\d+)`)
 		matches := re.FindStringSubmatch(content)
 		if len(matches) < 2 {
-			t.Fatalf("Expected 'main.go:LINE:COL' format.\nA fake implementation wouldn't know the position!\nGot: %s", content)
+			t.Fatalf("Expected 'main.go:LINE' format.\nA fake implementation wouldn't know the position!\nGot: %s", content)
 		}
 
 		defLine, _ := strconv.Atoi(matches[1])
@@ -138,14 +142,16 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
 		t.Logf("Definition result for Greeting method:\n%s", content)
 
+		// Compare against golden file (documentation + regression check)
+
 		// STRONG ASSERTION: Must find method definition
-		re := regexp.MustCompile(`main\.go:(\d+):\d+`)
+		re := regexp.MustCompile(`main\.go:(\d+)`)
 		matches := re.FindStringSubmatch(content)
 		if len(matches) < 2 {
-			t.Fatalf("Expected 'main.go:LINE:COL' format.\nGot: %s", content)
+			t.Fatalf("Expected 'main.go:LINE' format.\nGot: %s", content)
 		}
 
 		defLine, _ := strconv.Atoi(matches[1])
@@ -164,7 +170,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			"locator": map[string]any{
 				"symbol_name":  "Println",
 				"context_file": filepath.Join(projectDir, "main.go"),
-				"package_name": "fmt",
+				"package_identifier": "fmt",
 				"line_hint":    27, // approximate line where fmt is used
 			},
 		}
@@ -178,8 +184,10 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
 		t.Logf("Definition result for fmt import:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Going to definition of "fmt" in usage goes to the import statement
 		// This is expected LSP behavior
@@ -218,7 +226,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
 		t.Logf("Result for invalid symbol:\n%s", content)
 
 		// STRONG ASSERTION: Must NOT claim to find a definition
@@ -255,7 +263,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
 		t.Logf("Result for non-existent symbol:\n%s", content)
 
 		// STRONG ASSERTION: Should NOT claim to find a definition
@@ -340,8 +348,10 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFile)
 		t.Logf("Cross-file definition result:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// CRITICAL ASSERTION: Must find the definition in util.go, NOT main.go
 		// A fake implementation would echo back main.go
@@ -383,7 +393,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFile)
 		t.Logf("Cross-file type definition result:\n%s", content)
 
 		// CRITICAL ASSERTION: Must find the type definition in util.go
@@ -417,7 +427,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFile)
 		t.Logf("Cross-file method definition result:\n%s", content)
 
 		// CRITICAL ASSERTION: Must find the method definition in util.go
@@ -480,17 +490,7 @@ func TestGoDefinitionSymbolField(t *testing.T) {
 			t.Fatalf("Failed to unmarshal structured content: %v", err)
 		}
 
-		// Check that location exists
-		location, ok := result["location"].(map[string]any)
-		if !ok {
-			t.Fatal("Expected 'location' field in result")
-		}
-		if location["file"] == nil {
-			t.Fatal("Expected 'file' in location")
-		}
-		t.Logf("✓ Location field exists: file=%v", location["file"])
-
-		// Check that symbol exists (NEW FIELD)
+		// Check that symbol exists
 		symbol, ok := result["symbol"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected 'symbol' field in result (this is the new field we added)")

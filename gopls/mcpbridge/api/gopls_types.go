@@ -8,21 +8,6 @@ package api
 
 // ===== Integrated gopls MCP Tool Types =====
 
-// IWorkspaceParams is the input for go_workspace tool.
-type IWorkspaceParams struct {
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
-}
-
-// OWorkspaceResult is the output for go_workspace tool.
-type OWorkspaceResult struct {
-	Summary string `json:"summary" jsonschema:"workspace summary"`
-}
-
 // SymbolFilter specifies which symbols to retrieve from a package.
 // This is a precision filter for the get_package_symbol_detail tool.
 // Matching logic:
@@ -68,12 +53,6 @@ type IGetPackageSymbolDetailParams struct {
 	// When set, creates/uses a view for that directory (useful for testing with temp directories).
 	// When empty, searches all available views (normal usage).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the working directory for package resolution (default: search all views)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // OGetPackageSymbolDetailResult is the output for get_package_symbol_detail tool.
@@ -92,12 +71,6 @@ type IDiagnosticsParams struct {
 	// When set, creates/uses a view for that directory (useful for testing with temp directories).
 	// When empty, uses the default view (normal usage).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the working directory for diagnostics (default: use default view)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // ODiagnosticsResult is the output for go_diagnostics tool.
@@ -112,8 +85,13 @@ type Diagnostic struct {
 	File     string `json:"file" jsonschema:"file path"`
 	Severity string `json:"severity" jsonschema:"severity of the diagnostic"`
 	Message  string `json:"message" jsonschema:"diagnostic message"`
-	Line     int    `json:"line" jsonschema:"line number (1-indexed)"`
-	Column   int    `json:"column" jsonschema:"column number (1-indexed)"`
+	// Line and Column are retained for reference but unreliable for LLM navigation.
+	// The CodeSnippet field below provides the actual source code context.
+	Line   int `json:"line,omitempty" jsonschema:"line number (1-indexed)"`
+	Column int `json:"column,omitempty" jsonschema:"column number (1-indexed)"`
+	// CodeSnippet is the actual source line containing the error.
+	// This is more reliable than line/column numbers for LLM understanding.
+	CodeSnippet string `json:"code_snippet" jsonschema:"the source code line containing the diagnostic"`
 }
 
 // ISearchParams is the input for go_search tool.
@@ -125,12 +103,6 @@ type ISearchParams struct {
 	// When set, creates/uses a view for that directory (useful for testing with temp directories).
 	// When empty, searches all available views (normal usage).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the working directory for symbol search (default: search all views)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // OSearchResult is the output for go_search tool.
@@ -146,19 +118,11 @@ type ISymbolReferencesParams struct {
 	// This uses semantic information (symbol name, context file, package, scope)
 	// instead of error-prone line/column numbers.
 	Locator SymbolLocator `json:"locator" jsonschema:"semantic symbol locator (symbol_name, context_file, package_name, parent_scope, kind, line_hint)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // OSymbolReferencesResult is the output for go_symbol_references tool.
 type OSymbolReferencesResult struct {
 	Summary string `json:"summary" jsonschema:"symbol references summary"`
-	// References is the list of symbol references found (location only).
-	References []SymbolReference `json:"references,omitempty" jsonschema:"list of symbol references"`
 	// Symbols is the list of rich symbol information for each unique referenced symbol.
 	// This provides signature, documentation, and snippet for each symbol.
 	Symbols []*Symbol `json:"symbols,omitempty" jsonschema:"rich symbol information for each referenced symbol"`
@@ -181,20 +145,11 @@ type IRenameSymbolParams struct {
 	Locator SymbolLocator `json:"locator" jsonschema:"semantic symbol locator (symbol_name, context_file, package_name, parent_scope, kind, line_hint)"`
 	// NewName is the new name for the symbol.
 	NewName string `json:"new_name" jsonschema:"the new name for the symbol"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // ORenameSymbolResult is the output for go_dryrun_rename_symbol tool.
 type ORenameSymbolResult struct {
 	Summary string `json:"summary" jsonschema:"rename changes summary"`
-	// UnifiedDiff is a unified diff format showing all changes.
-	// This is the standard diff format that can be applied with patch/git apply.
-	UnifiedDiff string `json:"unified_diff,omitempty" jsonschema:"unified diff format of all changes"`
 	// Changes is a line-by-line diff format that's LLM-friendly.
 	// Each change shows the complete old/new line content for easy verification and rewriting.
 	Changes []RenameChange `json:"changes,omitempty" jsonschema:"line-by-line changes with full line content"`
@@ -214,48 +169,12 @@ type RenameChange struct {
 	NewLine string `json:"new_line" jsonschema:"the complete content of the new line"`
 }
 
-// IFileContextParams is the input for go_file_context tool.
-type IFileContextParams struct {
-	File string `json:"file" jsonschema:"the absolute path to the file"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
-}
-
-// OFileContextResult is the output for go_file_context tool.
-type OFileContextResult struct {
-	Summary string `json:"summary" jsonschema:"file context summary"`
-}
-
 // IImplementationParams is the input for go_implementation tool.
 type IImplementationParams struct {
 	// Locator specifies the symbol to find implementations for.
 	// This uses semantic information (symbol name, context file, package, scope)
 	// instead of error-prone line/column numbers.
 	Locator SymbolLocator `json:"locator" jsonschema:"semantic symbol locator (symbol_name, context_file, package_name, parent_scope, kind, line_hint)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
-}
-
-// ImplementationLocation represents a single implementation location.
-type ImplementationLocation struct {
-	// File is the absolute path to the file containing the implementation.
-	File string `json:"file" jsonschema:"the file path of the implementation"`
-	// StartLine is the start line number (1-indexed).
-	StartLine int `json:"start_line" jsonschema:"the start line number (1-indexed)"`
-	// StartColumn is the start column number (1-indexed, UTF-16).
-	StartColumn int `json:"start_column" jsonschema:"the start column number (1-indexed, UTF-16)"`
-	// EndLine is the end line number (1-indexed).
-	EndLine int `json:"end_line" jsonschema:"the end line number (1-indexed)"`
-	// EndColumn is the end column number (1-indexed, UTF-16).
-	EndColumn int `json:"end_column" jsonschema:"the end column number (1-indexed, UTF-16)"`
 }
 
 // OImplementationResult is the output for go_implementation tool.
@@ -275,12 +194,6 @@ type IReadFileParams struct {
 	MaxBytes int `json:"max_bytes,omitempty" jsonschema:"maximum bytes to return (default: 0 = unlimited)"`
 	// MaxLines limits the number of lines returned. If 0 or not set, returns all content.
 	MaxLines int `json:"max_lines,omitempty" jsonschema:"maximum lines to return (default: 0 = unlimited)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // OReadFileResult is the output for go_read_file tool.
@@ -303,12 +216,6 @@ type IListToolsParams struct {
 	// CategoryFilter allows filtering tools by category (e.g., "analysis", "navigation", "information").
 	// If empty, all categories are returned.
 	CategoryFilter string `json:"category_filter,omitempty" jsonschema:"filter tools by category (default: empty = all categories)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // ToolDocumentation represents documentation for a single MCP tool.
@@ -344,34 +251,13 @@ type IDefinitionParams struct {
 	// When false (default), only signature and documentation are returned.
 	// When true, the function body implementation is also included.
 	IncludeBody bool `json:"include_body,omitempty" jsonschema:"whether to include function body in the returned Symbol (default: false)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
-}
-
-// DefinitionLocation represents a single definition location.
-type DefinitionLocation struct {
-	// File is the absolute path to the file containing the definition.
-	File string `json:"file" jsonschema:"the file path of the definition"`
-	// StartLine is the start line number (1-indexed).
-	StartLine int `json:"start_line" jsonschema:"the start line number (1-indexed)"`
-	// StartColumn is the start column number (1-indexed, UTF-16).
-	StartColumn int `json:"start_column" jsonschema:"the start column number (1-indexed, UTF-16)"`
-	// EndLine is the end line number (1-indexed).
-	EndLine int `json:"end_line" jsonschema:"the end line number (1-indexed)"`
-	// EndColumn is the end column number (1-indexed, UTF-16).
-	EndColumn int `json:"end_column" jsonschema:"the end column number (1-indexed, UTF-16)"`
 }
 
 // ODefinitionResult is the output for go_definition tool.
 type ODefinitionResult struct {
-	// Location is the definition location.
-	Location DefinitionLocation `json:"location" jsonschema:"the definition location"`
-	// Symbol is the symbol at the definition location (if available).
-	// Includes name, kind, signature, documentation, and optionally the body.
+	// Symbol is the symbol at the definition location.
+	// Includes name, kind, signature, file, line, documentation, and optionally the body.
+	// Note: Line number is provided (column omitted as code snippet is included).
 	Symbol *Symbol `json:"symbol,omitempty" jsonschema:"the symbol at the definition location"`
 	// Summary is a human-readable summary of the result.
 	Summary string `json:"summary" jsonschema:"definition result summary"`
@@ -381,13 +267,6 @@ type ODefinitionResult struct {
 type IAnalyzeWorkspaceParams struct {
 	// Cwd is the directory to analyze (uses session view if empty).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"directory to analyze (default: session view)"`
-
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters, not tokens)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // EntryPoint represents a code entry point discovered during workspace analysis.
@@ -450,22 +329,26 @@ type WorkspacePackage struct {
 type DiagnosticReport struct {
 	// File is the file path where the diagnostic was reported.
 	File string `json:"file" jsonschema:"the file path"`
-	// Line is the line number (1-indexed).
-	Line int `json:"line" jsonschema:"the line number (1-indexed)"`
-	// Column is the column number (1-indexed).
-	Column int `json:"column" jsonschema:"the column number (1-indexed)"`
+	// Line and Column are retained for reference but unreliable for LLM navigation.
+	// The CodeSnippet field below provides the actual source code context.
+	Line   int `json:"line,omitempty" jsonschema:"the line number (1-indexed)"`
+	Column int `json:"column,omitempty" jsonschema:"the column number (1-indexed)"`
 	// Severity is the severity level (error, warning, info, hint).
 	Severity string `json:"severity" jsonschema:"the severity level"`
 	// Message is the diagnostic message.
 	Message string `json:"message" jsonschema:"the diagnostic message"`
 	// Source is the source of the diagnostic (e.g., "go", "compiler").
 	Source string `json:"source" jsonschema:"the diagnostic source"`
-	// Code is the diagnostic code (if available).
-	Code string `json:"code,omitempty" jsonschema:"the diagnostic code"`
+	// DiagnosticCode is the diagnostic code (if available), e.g., "deprecated", "unused".
+	DiagnosticCode string `json:"diagnostic_code,omitempty" jsonschema:"the diagnostic code identifier"`
+	// CodeSnippet is the actual source line containing the error.
+	// This is more reliable than line/column numbers for LLM understanding.
+	CodeSnippet string `json:"code_snippet" jsonschema:"the source code line containing the diagnostic"`
 }
 
 // IDependencyGraphParams is the input for get_dependency_graph tool.
 type IDependencyGraphParams struct {
+	// todo: this may not be useful, LLM may not know the package path to analyze.
 	// PackagePath is the package import path (e.g., "net/http").
 	// If empty, analyzes the main module's root package.
 	PackagePath string `json:"package_path,omitempty" jsonschema:"the package import path (default: main module root)"`
@@ -479,12 +362,6 @@ type IDependencyGraphParams struct {
 	// If 0 or not set, and include_transitive is true, all levels are included.
 	// If set, traversal stops at this depth (1 = direct dependencies only).
 	MaxDepth int `json:"max_depth,omitempty" jsonschema:"maximum depth for transitive dependencies (default: 0 = unlimited)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // ODependencyGraphResult is the output for get_dependency_graph tool.
@@ -548,18 +425,13 @@ type ICallHierarchyParams struct {
 	// This is useful when analyzing files in temporary directories or specific workspaces.
 	// If not set, the default view is used.
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the working directory for call hierarchy analysis (default: use default view)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // OCallHierarchyResult is the output for get_call_hierarchy tool.
 type OCallHierarchyResult struct {
 	// Symbol is the symbol at the given position.
-	Symbol CallHierarchySymbol `json:"symbol" jsonschema:"the symbol at the given position"`
+	// Contains name, kind, signature, file, line, documentation, and optionally body.
+	Symbol Symbol `json:"symbol" jsonschema:"the symbol at the given position"`
 	// IncomingCalls are the functions that call this function.
 	IncomingCalls []CallHierarchyCall `json:"incoming_calls,omitempty" jsonschema:"functions that call this function"`
 	// OutgoingCalls are the functions that this function calls.
@@ -572,116 +444,21 @@ type OCallHierarchyResult struct {
 	Summary string `json:"summary" jsonschema:"call hierarchy summary"`
 }
 
-// CallHierarchySymbol represents a function in the call hierarchy.
-type CallHierarchySymbol struct {
-	// Name is the function name.
-	Name string `json:"name" jsonschema:"the function name"`
-	// Kind is the symbol kind (e.g., "Function", "Method").
-	Kind string `json:"kind,omitempty" jsonschema:"the symbol kind"`
-	// Detail contains additional details (e.g., package path).
-	Detail string `json:"detail,omitempty" jsonschema:"additional details"`
-	// File is the file path.
-	File string `json:"file" jsonschema:"the file path"`
-	// StartLine is the start line number (1-indexed).
-	StartLine int `json:"start_line" jsonschema:"the start line number (1-indexed)"`
-	// StartColumn is the start column number (1-indexed, UTF-16).
-	StartColumn int `json:"start_column" jsonschema:"the start column number (1-indexed, UTF-16)"`
-	// EndLine is the end line number (1-indexed).
-	EndLine int `json:"end_line" jsonschema:"the end line number (1-indexed)"`
-	// EndColumn is the end column number (1-indexed, UTF-16).
-	EndColumn int `json:"end_column" jsonschema:"the end column number (1-indexed, UTF-16)"`
-}
-
 // CallHierarchyCall represents a call in the hierarchy.
 type CallHierarchyCall struct {
 	// From is the calling function (for incoming) or called function (for outgoing).
-	From CallHierarchySymbol `json:"from" jsonschema:"the function in the call relationship"`
+	From Symbol `json:"from" jsonschema:"the function in the call relationship"`
 	// CallRanges are the locations where this call occurs (multiple if called multiple times).
 	CallRanges []CallRange `json:"call_ranges,omitempty" jsonschema:"locations where this call occurs"`
 }
 
 // CallRange represents a location where a call occurs.
+// Note: Line numbers only (no columns) for cleaner LLM consumption.
 type CallRange struct {
 	// File is the file path.
 	File string `json:"file" jsonschema:"the file path"`
 	// StartLine is the start line number (1-indexed).
 	StartLine int `json:"start_line" jsonschema:"the start line number (1-indexed)"`
-	// StartColumn is the start column number (1-indexed, UTF-16).
-	StartColumn int `json:"start_column" jsonschema:"the start column number (1-indexed, UTF-16)"`
 	// EndLine is the end line number (1-indexed).
 	EndLine int `json:"end_line" jsonschema:"the end line number (1-indexed)"`
-	// EndColumn is the end column number (1-indexed, UTF-16).
-	EndColumn int `json:"end_column" jsonschema:"the end column number (1-indexed, UTF-16)"`
-}
-
-// ===== ResponseSizeSetter implementations =====
-
-// GetMaxResponseSize implements ResponseSizeSetter for IWorkspaceParams.
-func (i IWorkspaceParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IGetPackageSymbolDetailParams.
-func (i IGetPackageSymbolDetailParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IDiagnosticsParams.
-func (i IDiagnosticsParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for ISearchParams.
-func (i ISearchParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for ISymbolReferencesParams.
-func (i ISymbolReferencesParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IRenameSymbolParams.
-func (i IRenameSymbolParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IFileContextParams.
-func (i IFileContextParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IImplementationParams.
-func (i IImplementationParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IReadFileParams.
-func (i IReadFileParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IListToolsParams.
-func (i IListToolsParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IDefinitionParams.
-func (i IDefinitionParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IAnalyzeWorkspaceParams.
-func (i IAnalyzeWorkspaceParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IDependencyGraphParams.
-func (i IDependencyGraphParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for ICallHierarchyParams.
-func (i ICallHierarchyParams) GetMaxResponseSize() int {
-	return i.MaxResponseSize
 }

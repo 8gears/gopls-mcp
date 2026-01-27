@@ -1,0 +1,1 @@
+package main; import "example.com/interfaces"; func main() { var _ interfaces.Reader }

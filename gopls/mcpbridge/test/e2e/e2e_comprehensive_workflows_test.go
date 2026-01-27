@@ -15,19 +15,17 @@ import (
 
 // TestRealWorkflow_UnderstandArchitecture simulates a new developer exploring the codebase
 func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("Step1_GetStarted", func(t *testing.T) {
 		// User asks: "What is this project?"
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name:      "get_started",
+			Name:      "go_get_started",
 			Arguments: map[string]any{},
 		})
 		if err != nil {
 			t.Fatalf("Failed to call get_started: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenWorkflowUnderstandArch)
 		t.Logf("Getting started:\n%s", testutil.TruncateString(resultContent, 1000))
 
 		// Should explain the project
@@ -40,7 +38,7 @@ func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
 		// User asks: "What packages are there?"
 		// Note: gopls-mcp is part of gopls module, so we query the parent module
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_module_packages",
+			Name: "go_list_module_packages",
 			Arguments: map[string]any{
 				"module_path":      "golang.org/x/tools/gopls",
 				"include_docs":     false,
@@ -53,7 +51,7 @@ func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
 			t.Fatalf("Failed to call list_module_packages: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenWorkflowUnderstandArch)
 		t.Logf("Packages:\n%s", testutil.TruncateString(resultContent, 2000))
 
 		// Should find gopls-mcp packages somewhere in the output
@@ -66,19 +64,19 @@ func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
 	t.Run("Step3_ExploreCorePackage", func(t *testing.T) {
 		// User asks: "What's in the core package?"
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to call list_package_symbols: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenWorkflowUnderstandArch)
 		t.Logf("Core package symbols:\n%s", testutil.TruncateString(resultContent, 2000))
 
 		// Should find Handler type and RegisterTools function
@@ -92,7 +90,7 @@ func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
 
 	t.Run("Step4_FindHandlerUsage", func(t *testing.T) {
 		// User asks: "Where is Handler used?"
-		handlersPath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+		handlersPath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
 		// Find the line number where Handler is defined
 		content, err := os.ReadFile(handlersPath)
@@ -124,7 +122,7 @@ func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
 			t.Fatalf("Failed to call go_symbol_references: %v", err)
 		}
 
-		resultContent := testutil.ResultText(res)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenWorkflowUnderstandArch)
 		t.Logf("Handler references:\n%s", testutil.TruncateString(resultContent, 2000))
 
 		// Should find references (may be 0 due to known limitation)
@@ -134,13 +132,11 @@ func TestRealWorkflow_UnderstandArchitecture(t *testing.T) {
 
 // TestRealWorkflow_ToolChain_ChainingMultipleTools tests realistic multi-step workflows
 func TestRealWorkflow_ToolChain_ChainingMultipleTools(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("Workflow: ExploreToolImplementation", func(t *testing.T) {
 		// Scenario: User wants to understand how go_definition tool works
 
 		// Step 1: Find the tool definition
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 
 		res1, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_search",
@@ -152,7 +148,7 @@ func TestRealWorkflow_ToolChain_ChainingMultipleTools(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Step 1 failed: %v", err)
 		}
-		searchResult := testutil.ResultText(res1)
+		searchResult := testutil.ResultText(t, res1, testutil.GoldenWorkflowToolChaining)
 		t.Logf("Step 1 - Search:\n%s", testutil.TruncateString(searchResult, 500))
 
 		if !strings.Contains(searchResult, "handleGoDefinition") {
@@ -172,7 +168,7 @@ func TestRealWorkflow_ToolChain_ChainingMultipleTools(t *testing.T) {
 		}
 
 		res2, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -186,7 +182,7 @@ func TestRealWorkflow_ToolChain_ChainingMultipleTools(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Step 2 failed: %v", err)
 		}
-		hierarchyResult := testutil.ResultText(res2)
+		hierarchyResult := testutil.ResultText(t, res2, testutil.GoldenWorkflowToolChaining)
 		t.Logf("Step 2 - Call Hierarchy:\n%s", testutil.TruncateString(hierarchyResult, 1000))
 
 		if !strings.Contains(hierarchyResult, "Call hierarchy") {
@@ -199,31 +195,31 @@ func TestRealWorkflow_ToolChain_ChainingMultipleTools(t *testing.T) {
 
 		// Step 1: Get dependency graph for core package
 		res1, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_dependency_graph",
+			Name: "go_get_dependency_graph",
 			Arguments: map[string]any{
 				"package_path":       "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_transitive": false,
-				"Cwd":                goplsMcpDir,
+				"Cwd":                globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Step 1 failed: %v", err)
 		}
-		depGraphResult := testutil.ResultText(res1)
+		depGraphResult := testutil.ResultText(t, res1, testutil.GoldenWorkflowToolChaining)
 		t.Logf("Step 1 - Dependency Graph:\n%s", testutil.TruncateString(depGraphResult, 2000))
 
 		// Step 2: Check what imports core
 		res2, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_modules",
+			Name: "go_list_modules",
 			Arguments: map[string]any{
 				"direct_only": true,
-				"Cwd":         goplsMcpDir,
+				"Cwd":         globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Step 2 failed: %v", err)
 		}
-		modulesResult := testutil.ResultText(res2)
+		modulesResult := testutil.ResultText(t, res2, testutil.GoldenWorkflowToolChaining)
 		t.Logf("Step 2 - All Modules:\n%s", testutil.TruncateString(modulesResult, 2000))
 
 		if !strings.Contains(modulesResult, "golang.org/x/tools") {
@@ -234,8 +230,6 @@ func TestRealWorkflow_ToolChain_ChainingMultipleTools(t *testing.T) {
 
 // TestRealWorkflow_ErrorScenarios tests how tools handle edge cases on real code
 func TestRealWorkflow_ErrorScenarios(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("NonExistentSymbol", func(t *testing.T) {
 		// Test: Search for something that doesn't exist
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
@@ -249,7 +243,7 @@ func TestRealWorkflow_ErrorScenarios(t *testing.T) {
 			t.Fatalf("Failed to call go_search: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenWorkflowErrorScenarios)
 		t.Logf("Search for non-existent symbol:\n%s", content)
 
 		// Should handle gracefully (not crash)
@@ -258,7 +252,7 @@ func TestRealWorkflow_ErrorScenarios(t *testing.T) {
 
 	t.Run("DefinitionInStdlib", func(t *testing.T) {
 		// Test: Find definition of fmt.Println (in stdlib)
-		mainPath := filepath.Join(goplsMcpDir, "test", "testdata", "projects", "simple", "main.go")
+		mainPath := filepath.Join(globalGoplsMcpDir, "test", "testdata", "projects", "simple", "main.go")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_definition",
@@ -275,7 +269,7 @@ func TestRealWorkflow_ErrorScenarios(t *testing.T) {
 			t.Fatalf("Failed to call go_definition: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenWorkflowErrorScenarios)
 		t.Logf("Definition of fmt.Println:\n%s", content)
 
 		// Should find definition in stdlib
@@ -285,27 +279,10 @@ func TestRealWorkflow_ErrorScenarios(t *testing.T) {
 
 	t.Run("LargeFileAnalysis", func(t *testing.T) {
 		// Test: Analyze a large file (handlers.go is ~1378 lines)
-		largeFilePath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+		largeFilePath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
-		// Get file context first (fast)
-		res1, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "go_file_context",
-			Arguments: map[string]any{
-				"file": largeFilePath,
-			},
-		})
-		if err != nil {
-			t.Fatalf("Failed to call go_file_context: %v", err)
-		}
-		contextResult := testutil.ResultText(res1)
-		t.Logf("Large file context:\n%s", contextResult)
-
-		if !strings.Contains(contextResult, "package") {
-			t.Error("Expected package information")
-		}
-
-		// Now read the file (slower but complete)
-		res2, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
+		// Read the file
+		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_read_file",
 			Arguments: map[string]any{
 				"file": largeFilePath,
@@ -314,7 +291,7 @@ func TestRealWorkflow_ErrorScenarios(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to call go_read_file: %v", err)
 		}
-		readResult := testutil.ResultText(res2)
+		readResult := testutil.ResultText(t, res, testutil.GoldenWorkflowErrorScenarios)
 		t.Logf("Large file read (size):\n%s", testutil.TruncateString(readResult, 500))
 
 		if !strings.Contains(readResult, "package") {
@@ -325,41 +302,39 @@ func TestRealWorkflow_ErrorScenarios(t *testing.T) {
 
 // TestRealWorkflow_MultiPackageAnalysis tests working across multiple packages
 func TestRealWorkflow_MultiPackageAnalysis(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("CompareAPIDesign", func(t *testing.T) {
 		// Scenario: User wants to compare the api package structure
 
 		// Step 1: List symbols in api package
 		res1, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/api",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to list api package symbols: %v", err)
 		}
-		apiSymbols := testutil.ResultText(res1)
+		apiSymbols := testutil.ResultText(t, res1, testutil.GoldenWorkflowMultiPackage)
 		t.Logf("API package symbols:\n%s", testutil.TruncateString(apiSymbols, 2000))
 
 		// Step 2: List symbols in core package
 		res2, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to list core package symbols: %v", err)
 		}
-		coreSymbols := testutil.ResultText(res2)
+		coreSymbols := testutil.ResultText(t, res2, testutil.GoldenWorkflowMultiPackage)
 		t.Logf("Core package symbols:\n%s", testutil.TruncateString(coreSymbols, 2000))
 
 		// Step 3: Both should have useful symbols
@@ -375,7 +350,7 @@ func TestRealWorkflow_MultiPackageAnalysis(t *testing.T) {
 		// Scenario: User wants to find all implementations of an interface
 
 		// Find an interface in the codebase
-		apiPath := filepath.Join(goplsMcpDir, "api", "gopls_types.go")
+		apiPath := filepath.Join(globalGoplsMcpDir, "api", "gopls_types.go")
 
 		content, err := os.ReadFile(apiPath)
 		if err != nil {
@@ -413,7 +388,7 @@ func TestRealWorkflow_MultiPackageAnalysis(t *testing.T) {
 			t.Fatalf("Failed to call go_implementation: %v", err)
 		}
 
-		result := testutil.ResultText(res)
+		result := testutil.ResultText(t, res, testutil.GoldenWorkflowMultiPackage)
 		t.Logf("Type hierarchy:\n%s", result)
 
 		// Tool should handle gracefully even if no implementations found
@@ -423,8 +398,6 @@ func TestRealWorkflow_MultiPackageAnalysis(t *testing.T) {
 
 // TestRealWorkflow_Performance tests performance on real codebase
 func TestRealWorkflow_Performance(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("BatchSymbolLookup", func(t *testing.T) {
 		// Test: Look up multiple symbols in sequence (common AI workflow)
 
@@ -443,7 +416,7 @@ func TestRealWorkflow_Performance(t *testing.T) {
 				t.Logf("Warning: Failed to search for %s: %v", symbol, err)
 				continue
 			}
-			results[symbol] = testutil.ResultText(res)
+			results[symbol] = testutil.ResultText(t, res, testutil.GoldenWorkflowPerformance)
 		}
 
 		t.Logf("Batch lookup results:")
@@ -463,19 +436,19 @@ func TestRealWorkflow_Performance(t *testing.T) {
 	t.Run("DeepAnalysis", func(t *testing.T) {
 		// Test: Deep analysis with include_bodies=true using list_package_symbols
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   false,
 				"include_bodies": true,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to call list_package_symbols with bodies: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenWorkflowPerformance)
 		t.Logf("Deep analysis with bodies:\n%s", testutil.TruncateString(content, 3000))
 
 		// Should handle large output
@@ -487,13 +460,11 @@ func TestRealWorkflow_Performance(t *testing.T) {
 
 // TestRealWorkflow_RefactoringScenarios tests realistic refactoring workflows
 func TestRealWorkflow_RefactoringScenarios(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindAllCallers", func(t *testing.T) {
 		// Test: Find all places that call a specific function
 
 		// Use get_call_hierarchy with incoming direction
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 
 		content, _ := os.ReadFile(wrappersPath)
 		lines := strings.Split(string(content), "\n")
@@ -511,7 +482,7 @@ func TestRealWorkflow_RefactoringScenarios(t *testing.T) {
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -526,7 +497,7 @@ func TestRealWorkflow_RefactoringScenarios(t *testing.T) {
 			t.Fatalf("Failed to get call hierarchy: %v", err)
 		}
 
-		hierarchy := testutil.ResultText(res)
+		hierarchy := testutil.ResultText(t, res, testutil.GoldenWorkflowRefactoring)
 		t.Logf("All callers:\n%s", testutil.TruncateString(hierarchy, 2000))
 
 		// Should show call hierarchy
@@ -538,21 +509,19 @@ func TestRealWorkflow_RefactoringScenarios(t *testing.T) {
 
 // TestRealWorkflow_DiagnosticsAndQuality checks code quality on real codebase
 func TestRealWorkflow_DiagnosticsAndQuality(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("CheckCodebaseHealth", func(t *testing.T) {
 		// Test: Run diagnostics on entire codebase
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_diagnostics",
 			Arguments: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to run diagnostics: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenWorkflowDiagnostics)
 		t.Logf("Codebase health:\n%s", testutil.TruncateString(content, 1000))
 
 		// Should complete without errors
@@ -565,48 +534,46 @@ func TestRealWorkflow_DiagnosticsAndQuality(t *testing.T) {
 		// Test: Find files with lots of code (potential complexity hotspots)
 
 		// Read handlers.go
-		handlersPath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+		handlersPath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
-		// Get file context
+		// Read the file to check its size
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "go_file_context",
+			Name: "go_read_file",
 			Arguments: map[string]any{
 				"file": handlersPath,
 			},
 		})
 		if err != nil {
-			t.Fatalf("Failed to get file context: %v", err)
+			t.Fatalf("Failed to read file: %v", err)
 		}
 
-		context := testutil.ResultText(res)
-		t.Logf("File info:\n%s", context)
+		content := testutil.ResultText(t, res, testutil.GoldenWorkflowDiagnostics)
+		t.Logf("File info (size: %d chars):\n%s", len(content), testutil.TruncateString(content, 500))
 
-		// Should identify the package
-		if !strings.Contains(context, "gopls/mcpbridge/core") && !strings.Contains(context, "golang.org/x/tools/gopls/mcpbridge/core") {
-			t.Error("Expected package information")
+		// Verify we got content
+		if !strings.Contains(content, "package") {
+			t.Error("Expected Go code in file")
 		}
 	})
 }
 
 // TestRealWorkflow_CrossModuleAnalysis tests working across module boundaries
 func TestRealWorkflow_CrossModuleAnalysis(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("AnalyzeModuleStructure", func(t *testing.T) {
 		// Test: Understand how gopls-mcp fits into the larger gopls module
 
 		// Step 1: List all modules
 		res1, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_modules",
+			Name: "go_list_modules",
 			Arguments: map[string]any{
 				"direct_only": true,
-				"Cwd":         goplsMcpDir,
+				"Cwd":         globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to list modules: %v", err)
 		}
-		modules := testutil.ResultText(res1)
+		modules := testutil.ResultText(t, res1, testutil.GoldenWorkflowCrossModule)
 		t.Logf("All modules:\n%s", testutil.TruncateString(modules, 2000))
 
 		// Should see golang.org/x/tools
@@ -616,15 +583,15 @@ func TestRealWorkflow_CrossModuleAnalysis(t *testing.T) {
 
 		// Step 2: Analyze workspace to see overall structure
 		res2, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "analyze_workspace",
+			Name: "go_analyze_workspace",
 			Arguments: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to analyze workspace: %v", err)
 		}
-		workspace := testutil.ResultText(res2)
+		workspace := testutil.ResultText(t, res2, testutil.GoldenWorkflowCrossModule)
 		t.Logf("Workspace analysis:\n%s", testutil.TruncateString(workspace, 2000))
 
 		// Should show project structure
@@ -638,18 +605,18 @@ func TestRealWorkflow_CrossModuleAnalysis(t *testing.T) {
 
 		// Get dependency graph for gopls-mcp
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_dependency_graph",
+			Name: "go_get_dependency_graph",
 			Arguments: map[string]any{
 				"package_path":       "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_transitive": false,
-				"Cwd":                goplsMcpDir,
+				"Cwd":                globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to get dependency graph: %v", err)
 		}
 
-		deps := testutil.ResultText(res)
+		deps := testutil.ResultText(t, res, testutil.GoldenWorkflowCrossModule)
 		t.Logf("Dependency chain:\n%s", testutil.TruncateString(deps, 2000))
 
 		// Should show dependencies

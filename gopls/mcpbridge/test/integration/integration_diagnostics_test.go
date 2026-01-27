@@ -29,8 +29,10 @@ func TestGoDiagnosticsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnostics)
 		t.Logf("Diagnostics result:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Should report diagnostics checked and no issues found
 		if !strings.Contains(content, "No issues found") {
@@ -75,7 +77,7 @@ func MissingBrace() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnostics)
 		t.Logf("Diagnostics for broken code:\n%s", content)
 
 		// Should report the syntax error (check for common error patterns)
@@ -120,7 +122,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnostics)
 		t.Logf("Type error diagnostics:\n%s", content)
 
 		// Should report type mismatch
@@ -168,7 +170,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnostics)
 		t.Logf("Import error diagnostics:\n%s", content)
 
 		// Should report import error or module not found
@@ -215,7 +217,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnostics)
 		t.Logf("Unused variable diagnostics:\n%s", content)
 
 		// Should report unused variable or show warning

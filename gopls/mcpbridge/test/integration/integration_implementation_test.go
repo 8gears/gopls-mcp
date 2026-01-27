@@ -122,8 +122,10 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenImplementation)
 		t.Logf("Interface implementations:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Should find implementations
 		if !strings.Contains(content, "implementation") && !strings.Contains(content, "Rectangle") && !strings.Contains(content, "Circle") {
@@ -199,7 +201,7 @@ func main() {
 			"locator": map[string]any{
 				"symbol_name":  "MyReader",
 				"context_file": mainGoPath,
-				"package_name": "main",
+				"package_identifier": "main",
 				"line_hint":    8,
 			},
 		}
@@ -213,8 +215,10 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenImplementation)
 		t.Logf("Interfaces implemented by type:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Should find interfaces
 		if !strings.Contains(content, "interface") && !strings.Contains(content, "implementation") {
@@ -289,7 +293,7 @@ func main() {
 			"locator": map[string]any{
 				"symbol_name":  "Write",
 				"context_file": mainGoPath,
-				"package_name": "main",
+				"package_identifier": "main",
 				"line_hint":    7,
 			},
 		}
@@ -303,7 +307,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenImplementation)
 		t.Logf("Method implementations:\n%s", content)
 
 		// Should find method implementations

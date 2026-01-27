@@ -17,7 +17,7 @@ func TestGetDependencyGraph_BasicFunctionality(t *testing.T) {
 	projectDir := testutil.CopyProjectTo(t, "simple")
 
 	t.Run("DirectDependenciesOnly", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/simple",
@@ -29,8 +29,10 @@ func TestGetDependencyGraph_BasicFunctionality(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphBasic)
 		t.Logf("Direct dependencies only:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Verify structure
 		requiredStrings := []string{
@@ -56,7 +58,7 @@ func TestGetDependencyGraph_BasicFunctionality(t *testing.T) {
 	})
 
 	t.Run("DefaultPackagePath_UsesMainModule", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"include_transitive": false,
@@ -67,7 +69,7 @@ func TestGetDependencyGraph_BasicFunctionality(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphBasic)
 		t.Logf("Default package path:\n%s", content)
 
 		// Should default to main module
@@ -82,7 +84,7 @@ func TestGetDependencyGraph_TransitiveDependencies(t *testing.T) {
 	projectDir := testutil.CopyProjectTo(t, "simple")
 
 	t.Run("FullTransitiveTree", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/simple",
@@ -94,7 +96,7 @@ func TestGetDependencyGraph_TransitiveDependencies(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphTransitive)
 		t.Logf("Full transitive tree:\n%s", content)
 
 		// Should have many more dependencies than direct
@@ -119,7 +121,7 @@ func TestGetDependencyGraph_TransitiveDependencies(t *testing.T) {
 	})
 
 	t.Run("MaxDepthLimiting", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/simple",
@@ -132,7 +134,7 @@ func TestGetDependencyGraph_TransitiveDependencies(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphTransitive)
 		t.Logf("Max depth 1:\n%s", content)
 
 		// With max_depth=1, should only get direct dependencies
@@ -156,7 +158,7 @@ func TestGetDependencyGraph_TransitiveDependencies(t *testing.T) {
 	})
 
 	t.Run("MaxDepthZero_Unlimited", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/simple",
@@ -169,7 +171,7 @@ func TestGetDependencyGraph_TransitiveDependencies(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphTransitive)
 		t.Logf("Max depth 0 (unlimited):\n%s", content)
 
 		// max_depth=0 means unlimited, should get many dependencies
@@ -185,7 +187,7 @@ func TestGetDependencyGraph_Dependents(t *testing.T) {
 		projectDir := testutil.CopyProjectTo(t, "simple")
 
 		// Check what imports fmt
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "fmt",
@@ -196,7 +198,7 @@ func TestGetDependencyGraph_Dependents(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphDependents)
 		t.Logf("fmt dependents:\n%s", content)
 
 		// fmt should be imported by the main package
@@ -271,7 +273,7 @@ go 1.21
 		}
 
 		// Check dependents of shared package
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "example.com/test/shared",
@@ -282,7 +284,7 @@ go 1.21
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphDependents)
 		t.Logf("shared package dependents:\n%s", content)
 
 		// shared should be imported by both pkg1 and pkg2
@@ -300,7 +302,7 @@ func TestGetDependencyGraph_StdlibPackages(t *testing.T) {
 	projectDir := testutil.CopyProjectTo(t, "simple")
 
 	t.Run("StdlibPackageMarkedCorrectly", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "fmt",
@@ -311,7 +313,7 @@ func TestGetDependencyGraph_StdlibPackages(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphStdlib)
 		t.Logf("Stdlib package dependencies:\n%s", content)
 
 		// Stdlib dependencies should be marked
@@ -353,7 +355,7 @@ go 1.21
 			t.Fatal(err)
 		}
 
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/test",
@@ -365,7 +367,7 @@ go 1.21
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphStdlib)
 		t.Logf("Stdlib vs external:\n%s", content)
 
 		// All should be stdlib, none external
@@ -387,7 +389,7 @@ func TestGetDependencyGraph_ErrorHandling(t *testing.T) {
 	t.Run("NonExistentPackage", func(t *testing.T) {
 		projectDir := testutil.CopyProjectTo(t, "simple")
 
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "nonexistent/package/that/does/not/exist",
@@ -399,7 +401,7 @@ func TestGetDependencyGraph_ErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Logf("Expected error for non-existent package: %v", err)
 		} else if res != nil {
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphError)
 			if !strings.Contains(content, "not found") &&
 				!strings.Contains(content, "error") {
 				t.Logf("Warning: Tool didn't error for non-existent package: %s", content)
@@ -430,7 +432,7 @@ go 1.21
 
 		// Try with invalid cwd
 
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          "/nonexistent/directory",
 			"package_path": "fmt",
@@ -457,7 +459,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"include_transitive": false,
@@ -508,7 +510,7 @@ go 1.21
 		}
 
 		// Check the main package's dependents
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "example.com/test",
@@ -519,7 +521,7 @@ go 1.21
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenMain)
 		t.Logf("Test package dependents:\n%s", content)
 
 		// The main package might be imported by its test variant
@@ -536,7 +538,7 @@ func TestGetDependencyGraph_ComplexScenarios(t *testing.T) {
 		projectDir := testutil.CopyProjectTo(t, "simple")
 
 		// Check a package with deep dependencies
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "fmt",
@@ -548,7 +550,7 @@ func TestGetDependencyGraph_ComplexScenarios(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphComplex)
 		t.Logf("Deep dependency chain:\n%s", content)
 
 		// fmt has deep dependencies through io, os, etc.
@@ -574,7 +576,7 @@ func TestGetDependencyGraph_ComplexScenarios(t *testing.T) {
 		// The tool should handle them gracefully without infinite loops
 		projectDir := testutil.CopyProjectTo(t, "simple")
 
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/simple",
@@ -587,7 +589,7 @@ func TestGetDependencyGraph_ComplexScenarios(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		_ = testutil.ResultText(res) // Just verify it completes
+		_ = testutil.ResultText(t, res, testutil.GoldenDependencyGraphComplex) // Just verify it completes
 		t.Log("Cyclic dependency handling: tool completed successfully")
 	})
 }
@@ -598,7 +600,7 @@ func TestGetDependencyGraph_Integration(t *testing.T) {
 		projectDir := testutil.CopyProjectTo(t, "simple")
 
 		// First, list packages
-		listTool := "list_module_packages"
+		listTool := "go_list_module_packages"
 		listArgs := map[string]any{
 			"Cwd":              projectDir,
 			"include_docs":     false,
@@ -612,7 +614,7 @@ func TestGetDependencyGraph_Integration(t *testing.T) {
 			t.Fatalf("Failed to call %s: %v", listTool, err)
 		}
 
-		listContent := testutil.ResultText(listRes)
+		listContent := testutil.ResultText(t, listRes, testutil.GoldenDependencyGraphIntegration)
 		t.Logf("Packages in module:\n%s", listContent)
 
 		// Should find the main package
@@ -621,7 +623,7 @@ func TestGetDependencyGraph_Integration(t *testing.T) {
 		}
 
 		// Now get dependency graph for that package
-		depTool := "get_dependency_graph"
+		depTool := "go_get_dependency_graph"
 		depArgs := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "example.com/simple",
@@ -632,7 +634,7 @@ func TestGetDependencyGraph_Integration(t *testing.T) {
 			t.Fatalf("Failed to call %s: %v", depTool, err)
 		}
 
-		depContent := testutil.ResultText(depRes)
+		depContent := testutil.ResultText(t, depRes, testutil.GoldenDependencyGraphIntegration)
 		t.Logf("Dependency graph:\n%s", depContent)
 
 		// Both tools should agree on the package name
@@ -677,11 +679,11 @@ go 1.21
 			t.Fatalf("Failed to call %s: %v", diagTool, err)
 		}
 
-		diagContent := testutil.ResultText(diagRes)
+		diagContent := testutil.ResultText(t, diagRes, testutil.GoldenDependencyGraphIntegration)
 		t.Logf("Diagnostics:\n%s", diagContent)
 
 		// Now get dependency graph
-		depTool := "get_dependency_graph"
+		depTool := "go_get_dependency_graph"
 		depArgs := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/test",
@@ -693,7 +695,7 @@ go 1.21
 			t.Fatalf("Failed to call %s: %v", depTool, err)
 		}
 
-		depContent := testutil.ResultText(depRes)
+		depContent := testutil.ResultText(t, depRes, testutil.GoldenDependencyGraphIntegration)
 		t.Logf("Dependency graph:\n%s", depContent)
 
 		// Dependencies should be valid (no errors expected)
@@ -713,7 +715,7 @@ func TestGetDependencyGraph_OutputFormat(t *testing.T) {
 	projectDir := testutil.CopyProjectTo(t, "simple")
 
 	t.Run("OutputStructure", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":          projectDir,
 			"package_path": "example.com/simple",
@@ -724,7 +726,7 @@ func TestGetDependencyGraph_OutputFormat(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphOutputFormat)
 		t.Logf("Output format:\n%s", content)
 
 		// Verify key sections exist
@@ -751,7 +753,7 @@ func TestGetDependencyGraph_OutputFormat(t *testing.T) {
 	})
 
 	t.Run("IndentationForTransitiveDeps", func(t *testing.T) {
-		tool := "get_dependency_graph"
+		tool := "go_get_dependency_graph"
 		args := map[string]any{
 			"Cwd":                projectDir,
 			"package_path":       "example.com/simple",
@@ -763,7 +765,7 @@ func TestGetDependencyGraph_OutputFormat(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenDependencyGraphOutputFormat)
 		t.Logf("Indented output:\n%s", content)
 
 		// Transitive dependencies should be indented

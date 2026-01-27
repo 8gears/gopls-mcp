@@ -43,7 +43,7 @@ func TestCacheIsWarmedOnStartup(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCacheWarmedOnStartup)
 
 		// CRITICAL: If warmCache didn't trigger LoadMetadataGraph,
 		// this will fail with "cache is empty" error message
@@ -75,7 +75,7 @@ func TestCacheIsWarmedOnStartup(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCacheWarmedOnStartup)
 
 		// Verify no cache empty error
 		if strings.Contains(content, "cache is empty") {
@@ -115,7 +115,7 @@ func TestCacheWarmupRaceCondition(t *testing.T) {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenCacheWarmupRace)
 
 			// If we see "cache is empty", the warmCache didn't finish
 			// before this tool call - a race condition!

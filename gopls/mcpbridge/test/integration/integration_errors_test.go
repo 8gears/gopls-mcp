@@ -47,27 +47,7 @@ func main() {
 			if err != nil {
 				t.Logf("Expected error for nonexistent file: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
-				if !strings.Contains(content, "not found") &&
-					!strings.Contains(content, "no such file") &&
-					!strings.Contains(content, "error") {
-					t.Logf("Warning: Tool didn't error for nonexistent file: %s", content)
-				}
-			}
-		})
-
-		t.Run("GoFileContext_NonExistent", func(t *testing.T) {
-			tool := "go_file_context"
-			args := map[string]any{
-				"file": "/nonexistent/path/to/file.go",
-			}
-
-			res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
-
-			if err != nil {
-				t.Logf("Expected error for nonexistent file: %v", err)
-			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				if !strings.Contains(content, "not found") &&
 					!strings.Contains(content, "no such file") &&
 					!strings.Contains(content, "error") {
@@ -132,7 +112,7 @@ func main() {
 			if err != nil {
 				t.Logf("Expected error for out of range position: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Result for out of range position: %s", content)
 				// Should not crash - may return empty or error message
 			}
@@ -155,7 +135,7 @@ func main() {
 			if err != nil {
 				t.Logf("Got error for non-existent symbol: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Result for non-existent symbol: %s", content)
 			}
 		})
@@ -200,7 +180,7 @@ func main( {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 			t.Logf("Diagnostics for malformed code:\n%s", content)
 
 			// Should report syntax errors
@@ -212,7 +192,7 @@ func main( {
 		})
 
 		t.Run("GoPackageAPI_MalformedCode", func(t *testing.T) {
-			tool := "get_package_symbol_detail"
+			tool := "go_get_package_symbol_detail"
 			args := map[string]any{
 				"packagePaths":   []string{"example.com/test"},
 				"include_bodies": false,
@@ -224,7 +204,7 @@ func main( {
 			if err != nil {
 				t.Logf("Expected error for malformed code: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Package API for malformed code:\n%s", content)
 			}
 		})
@@ -251,7 +231,7 @@ func main() {
 		}
 
 		t.Run("GoPackageAPI_EmptyPackageList", func(t *testing.T) {
-			tool := "get_package_symbol_detail"
+			tool := "go_get_package_symbol_detail"
 			args := map[string]any{
 				"packagePaths":   []string{}, // Empty list
 				"include_bodies": false,
@@ -263,7 +243,7 @@ func main() {
 			if err != nil {
 				t.Logf("Empty package list caused error: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Result for empty package list: %s", content)
 			}
 		})
@@ -280,7 +260,7 @@ func main() {
 			if err != nil {
 				t.Logf("Empty query caused error: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Result for empty query: %s", content)
 			}
 		})
@@ -327,7 +307,7 @@ func main() {
 			if err != nil {
 				t.Logf("Expected error for non-existent symbol: %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Rename result for non-existent symbol: %s", content)
 				// Should indicate no changes or error
 			}
@@ -369,7 +349,7 @@ func main() {
 			if err != nil {
 				t.Logf("Very long query caused error (acceptable): %v", err)
 			} else if res != nil {
-				content := testutil.ResultText(res)
+				content := testutil.ResultText(t, res, testutil.GoldenErrorHandling)
 				t.Logf("Result for very long query (length: %d): %s", len(content), content[:min(100, len(content))])
 			}
 		})

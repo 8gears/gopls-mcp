@@ -8,6 +8,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/jba/templatecheck v0.7.1
 	github.com/modelcontextprotocol/go-sdk v1.1.0
+	github.com/rogpeppe/go-internal v1.14.1
 	golang.org/x/mod v0.32.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/telemetry v0.0.0-20260109210033-bd525da824e2

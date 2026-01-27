@@ -1,16 +1,5 @@
 package api
 
-// ResponseSizeSetter is implemented by input types that want to override the global
-// response size limit on a per-request basis.
-//
-// Returns:
-//   - 0 if not set (use global config)
-//   - negative if field is negative (no limit)
-//   - positive value to use as specific limit (in bytes)
-type ResponseSizeSetter interface {
-	GetMaxResponseSize() int
-}
-
 // SymbolLocator defines a semantic location for a code symbol.
 //
 // Unlike LSP "Location" (which relies on volatile File/Line/Column coordinates),
@@ -42,7 +31,7 @@ type SymbolLocator struct {
 	// Example: "/Users/dev/project/server/http.go"
 	ContextFile string `json:"context_file" jsonschema:"The absolute path of the file you are currently reading or analyzing. This serves as the starting point for resolution."`
 
-	// PackageName is the package name or alias *as seen in the ContextFile*.
+	// PackageIdentifier is the package name or alias *as seen in the ContextFile*.
 	//
 	// Usage:
 	// - If the symbol is imported (e.g., "fmt.Println"), use "fmt".
@@ -51,7 +40,7 @@ type SymbolLocator struct {
 	// The MCP server will resolve this string to the full import path (e.g., "fmt" -> "fmt", "u" -> "github.com/google/uuid").
 	//
 	// Example: "json" (for encoding/json), "myapi" (for project/api/v2)
-	PackageName string `json:"package_name,omitempty" jsonschema:"The package name or import alias if the symbol is imported (e.g., 'fmt', 'json'). Leave empty if the symbol is defined in the current package."`
+	PackageIdentifier string `json:"package_identifier,omitempty" jsonschema:"The package name or import alias if the symbol is imported (e.g., 'fmt', 'json'). Leave empty if the symbol is defined in the current package."`
 
 	// ParentScope is the name of the enclosing structure used for disambiguation.
 	//
@@ -93,28 +82,4 @@ type SymbolLocator struct {
 	//
 	// Example: "func (s *Server) Start(ctx context.Context)"
 	SignatureSnippet string `json:"signature_snippet,omitempty" jsonschema:"A distinct snippet of code (like the function signature) used to verify the match."`
-}
-
-// FileLocation identifies a specific location in a file.
-type FileLocation struct {
-	// File is the absolute path to the file.
-	File string `json:"file" jsonschema:"the absolute path to the file"`
-	// Line is the line number (1-indexed).
-	Line int `json:"line,omitempty" jsonschema:"the line number (1-indexed)"`
-	// Column is the column number (1-indexed, UTF-16).
-	Column int `json:"column,omitempty" jsonschema:"the column number (1-indexed, UTF-16)"`
-}
-
-// SymbolReference represents a reference to a symbol.
-// TODO: for LLM, whether location is really necessary?
-// also, if another package is using it, the response is insane.
-// we should consider to return filepath and package name as well,
-// think about whether locatioin makes sense in that case.
-type SymbolReference struct {
-	// Name is the symbol name.
-	Name string `json:"name" jsonschema:"the symbol name"`
-	// Kind is the symbol kind (e.g., "Function", "Struct", "Variable").
-	Kind string `json:"kind,omitempty" jsonschema:"the symbol kind"`
-	// Location is where the symbol is defined or referenced.
-	Location FileLocation `json:"location" jsonschema:"the location of the symbol"`
 }

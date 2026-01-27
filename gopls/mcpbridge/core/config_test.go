@@ -36,9 +36,6 @@ func TestLoadConfig(t *testing.T) {
 				"staticcheck": true,
 				"buildFlags": ["-tags=integration"]
 			},
-			"logging": {
-				"level": "debug"
-			},
 			"workdir": "/test/path"
 		}`
 
@@ -49,10 +46,6 @@ func TestLoadConfig(t *testing.T) {
 
 		if config.Workdir != "/test/path" {
 			t.Errorf("Expected workdir /test/path, got %s", config.Workdir)
-		}
-
-		if config.Logging == nil || config.Logging.Level != "debug" {
-			t.Error("Expected logging level debug")
 		}
 
 		if len(config.Gopls) != 2 {
@@ -251,11 +244,7 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("Expected Gopls map to be initialized")
 	}
 
-	if config.Logging == nil {
-		t.Error("Expected Logging to be initialized")
-	}
-
-	if config.Logging.Level != "info" {
-		t.Errorf("Expected default logging level info, got %s", config.Logging.Level)
+	if config.MaxResponseBytes != 32000 {
+		t.Errorf("Expected default MaxResponseBytes 32000, got %d", config.MaxResponseBytes)
 	}
 }

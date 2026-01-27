@@ -15,14 +15,10 @@ import (
 
 // TestAllTools runs comprehensive tests for all MCP tools using table-driven approach
 func TestAllTools(t *testing.T) {
-	goplsMcpDir, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatalf("Failed to get gopls-mcp directory: %v", err)
-	}
 
 	// Read files for line number lookups
-	wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
-	handlersPath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+	wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
+	handlersPath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
 	wrappersContent, _ := os.ReadFile(wrappersPath)
 	handlersContent, _ := os.ReadFile(handlersPath)
@@ -46,11 +42,11 @@ func TestAllTools(t *testing.T) {
 	testCases := []testCase{
 		// Discovery Tools
 		{
-			name: "list_modules",
-			tool: "list_modules",
+			name: "go_list_modules",
+			tool: "go_list_modules",
 			args: map[string]any{
 				"direct_only": true,
-				"Cwd":         goplsMcpDir,
+				"Cwd":         globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "golang.org/x/tools") {
@@ -59,8 +55,8 @@ func TestAllTools(t *testing.T) {
 			},
 		},
 		{
-			name: "list_module_packages",
-			tool: "list_module_packages",
+			name: "go_list_module_packages",
+			tool: "go_list_module_packages",
 			args: map[string]any{
 				"module_path":      "golang.org/x/text",
 				"include_docs":     false,
@@ -75,13 +71,13 @@ func TestAllTools(t *testing.T) {
 			},
 		},
 		{
-			name: "list_package_symbols",
-			tool: "list_package_symbols",
+			name: "go_list_package_symbols",
+			tool: "go_list_package_symbols",
 			args: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "Handler") {
@@ -93,10 +89,10 @@ func TestAllTools(t *testing.T) {
 			},
 		},
 		{
-			name: "analyze_workspace",
-			tool: "analyze_workspace",
+			name: "go_analyze_workspace",
+			tool: "go_analyze_workspace",
 			args: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "module") {
@@ -105,8 +101,8 @@ func TestAllTools(t *testing.T) {
 			},
 		},
 		{
-			name: "get_started",
-			tool: "get_started",
+			name: "go_get_started",
+			tool: "go_get_started",
 			args: map[string]any{},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "gopls-mcp") {
@@ -115,8 +111,8 @@ func TestAllTools(t *testing.T) {
 			},
 		},
 		{
-			name: "list_tools",
-			tool: "list_tools",
+			name: "go_list_tools",
+			tool: "go_list_tools",
 			args: map[string]any{},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "tools") && !strings.Contains(content, "NAVIGATION") {
@@ -158,14 +154,14 @@ func TestAllTools(t *testing.T) {
 		},
 		// Analysis Tools
 		{
-			name: "get_package_symbol_detail",
-			tool: "get_package_symbol_detail",
+			name: "go_get_package_symbol_detail",
+			tool: "go_get_package_symbol_detail",
 			args: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"symbol_filters": []map[string]any{{"name": "Handler"}, {"name": "RegisterTools"}},
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "Handler") && !strings.Contains(content, "RegisterTools") {
@@ -180,6 +176,7 @@ func TestAllTools(t *testing.T) {
 				"locator": map[string]any{
 					"symbol_name":  "Handler",
 					"context_file": handlersPath,
+					// todo: this is wrong, we should test for interface.
 					"kind":         "struct",
 					"line_hint":    handlerStructLine,
 				},
@@ -202,6 +199,8 @@ func TestAllTools(t *testing.T) {
 				},
 			},
 			assertion: func(t *testing.T, content string) {
+				// todo: it requires a stronger assert, checking not found is not enough.
+				// we should check the references are found correctly.
 				if strings.Contains(content, "No references found") {
 					t.Log("Known limitation: Searching from definition file")
 				}
@@ -210,8 +209,8 @@ func TestAllTools(t *testing.T) {
 			skipReason: "Could not find Handler struct definition",
 		},
 		{
-			name: "get_call_hierarchy",
-			tool: "get_call_hierarchy",
+			name: "go_get_call_hierarchy",
+			tool: "go_get_call_hierarchy",
 			args: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -230,12 +229,12 @@ func TestAllTools(t *testing.T) {
 			skipReason: "Could not find handleGoDefinition function",
 		},
 		{
-			name: "get_dependency_graph",
-			tool: "get_dependency_graph",
+			name: "go_get_dependency_graph",
+			tool: "go_get_dependency_graph",
 			args: map[string]any{
 				"package_path":       "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_transitive": false,
-				"Cwd":                goplsMcpDir,
+				"Cwd":                globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "Dependencies") && !strings.Contains(content, "imports") {
@@ -248,7 +247,7 @@ func TestAllTools(t *testing.T) {
 			name: "go_diagnostics",
 			tool: "go_diagnostics",
 			args: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "packages") && !strings.Contains(content, "diagnostics") {
@@ -258,18 +257,6 @@ func TestAllTools(t *testing.T) {
 		},
 		// File Tools
 		{
-			name: "go_file_context",
-			tool: "go_file_context",
-			args: map[string]any{
-				"file": handlersPath,
-			},
-			assertion: func(t *testing.T, content string) {
-				if !strings.Contains(content, "package") {
-					t.Errorf("Expected package information, got: %s", content)
-				}
-			},
-		},
-		{
 			name: "go_read_file",
 			tool: "go_read_file",
 			args: map[string]any{
@@ -278,16 +265,6 @@ func TestAllTools(t *testing.T) {
 			assertion: func(t *testing.T, content string) {
 				if !strings.Contains(content, "package") && !strings.Contains(content, "func") {
 					t.Errorf("Expected Go code content, got: %s", content)
-				}
-			},
-		},
-		{
-			name: "go_workspace",
-			tool: "go_workspace",
-			args: map[string]any{},
-			assertion: func(t *testing.T, content string) {
-				if !strings.Contains(content, "module") && !strings.Contains(content, "directory") {
-					t.Errorf("Expected workspace information, got: %s", content)
 				}
 			},
 		},
@@ -311,7 +288,7 @@ func TestAllTools(t *testing.T) {
 			}
 
 			// Get and truncate content for logging
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenAllTools)
 			t.Logf("%s result:\n%s", tc.tool, testutil.TruncateString(content, 2000))
 
 			// Run assertion

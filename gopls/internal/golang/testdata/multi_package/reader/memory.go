@@ -1,0 +1,1 @@
+package reader; import "example.com/interfaces"; type Memory struct { data []byte }; func (m *Memory) Read() ([]byte, error) { return m.data, nil }; var _ interfaces.Reader = (*Memory)(nil)

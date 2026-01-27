@@ -16,11 +16,6 @@ import (
 
 // TestErrorScenarios runs comprehensive tests for error scenarios using table-driven approach
 func TestErrorScenarios(t *testing.T) {
-	goplsMcpDir, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatalf("Failed to get gopls-mcp directory: %v", err)
-	}
-
 	// Define all test cases
 	testCases := []setupTestCase{
 		// Test 1: Syntax Errors
@@ -30,25 +25,7 @@ func TestErrorScenarios(t *testing.T) {
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				brokenFile := filepath.Join(tmpDir, "broken_syntax.go")
-				brokenCode := `package main
-
-import "fmt"
-
-func BrokenSyntax() {
-	// Missing closing brace
-	x := func() {
-		fmt.Println("hello")
-	// }
-
-	// Extra closing brace
-}
-}
-
-func AnotherError() {
-	var x int
-	x = "string"  // Type mismatch
-}
-`
+				brokenCode := testutil.ReadTestData("error/broken_syntax.go")
 				if err := os.WriteFile(brokenFile, []byte(brokenCode), 0644); err != nil {
 					t.Fatalf("Failed to write broken file: %v", err)
 				}
@@ -67,13 +44,7 @@ func AnotherError() {
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				brokenFile := filepath.Join(tmpDir, "broken_syntax.go")
-				brokenCode := `package main
-
-import "fmt"
-
-func BrokenSyntax() {
-	fmt.Println("hello")
-}`
+				brokenCode := testutil.ReadTestData("error/broken_syntax.go")
 				if err := os.WriteFile(brokenFile, []byte(brokenCode), 0644); err != nil {
 					t.Fatalf("Failed to write broken file: %v", err)
 				}
@@ -98,13 +69,7 @@ func BrokenSyntax() {
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				missingImportFile := filepath.Join(tmpDir, "missing_import.go")
-				code := `package main
-
-func MissingImport() {
-	// Using an unimported package
-	x := make(chan int)
-	close(x)
-}`
+				code := testutil.ReadTestData("error/missing_import.go")
 				if err := os.WriteFile(missingImportFile, []byte(code), 0644); err != nil {
 					t.Fatalf("Failed to write file: %v", err)
 				}
@@ -123,11 +88,7 @@ func MissingImport() {
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				missingImportFile := filepath.Join(tmpDir, "missing_import.go")
-				code := `package main
-
-func MissingImport() {
-	make(chan int)
-}`
+				code := testutil.ReadTestData("error/missing_import_ref.go")
 				if err := os.WriteFile(missingImportFile, []byte(code), 0644); err != nil {
 					t.Fatalf("Failed to write file: %v", err)
 				}
@@ -152,18 +113,7 @@ func MissingImport() {
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				typeErrorFile := filepath.Join(tmpDir, "type_errors.go")
-				code := `package main
-
-func TypeErrors() {
-	var x int
-	x = "string"  // Type error
-
-	var y string
-	y = 123  // Type error
-
-	var z interface{}
-	z = func() {}  // This is actually valid
-}`
+				code := testutil.ReadTestData("error/type_errors.go")
 				if err := os.WriteFile(typeErrorFile, []byte(code), 0644); err != nil {
 					t.Fatalf("Failed to write file: %v", err)
 				}
@@ -183,7 +133,7 @@ func TypeErrors() {
 			args: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "DummySymbol",
-					"context_file": filepath.Join(goplsMcpDir, "test", "testdata", "dummy.go"),
+					"context_file": filepath.Join(globalGoplsMcpDir, "test", "testdata", "dummy.go"),
 					"line_hint":    1,
 				},
 			},
@@ -212,7 +162,7 @@ func TypeErrors() {
 			args: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "FakeHandlerSymbolThatDoesNotExist",
-					"context_file": filepath.Join(goplsMcpDir, "core", "handlers.go"),
+					"context_file": filepath.Join(globalGoplsMcpDir, "core", "handlers.go"),
 					"kind":         "struct",
 					"line_hint":    25,
 				},
@@ -228,11 +178,7 @@ func TypeErrors() {
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				undeclaredFile := filepath.Join(tmpDir, "undeclared.go")
-				code := `package main
-
-func UndeclaredUsage() {
-	println(undefinedVar)  // Undeclared variable
-}`
+				code := testutil.ReadTestData("error/undeclared.go")
 				if err := os.WriteFile(undeclaredFile, []byte(code), 0644); err != nil {
 					t.Fatalf("Failed to write file: %v", err)
 				}
@@ -255,15 +201,9 @@ func UndeclaredUsage() {
 				file1 := filepath.Join(tmpDir, "file1.go")
 				file2 := filepath.Join(tmpDir, "file2.go")
 
-				code1 := `package main
+				code1 := testutil.ReadTestData("error/file1.go")
 
-func Func1() {}
-`
-
-				code2 := `package other // Different package in same directory!
-
-func Func2() {}
-`
+				code2 := testutil.ReadTestData("error/file2.go")
 
 				os.WriteFile(file1, []byte(code1), 0644)
 				os.WriteFile(file2, []byte(code2), 0644)
@@ -279,21 +219,15 @@ func Func2() {}
 		},
 		{
 			name: "InvalidPackage_ListSymbolsInInvalidPackage",
-			tool: "list_package_symbols",
+			tool: "go_list_package_symbols",
 			setup: func(t *testing.T) map[string]any {
 				tmpDir := t.TempDir()
 				file1 := filepath.Join(tmpDir, "file1.go")
 				file2 := filepath.Join(tmpDir, "file2.go")
 
-				code1 := `package main
+				code1 := testutil.ReadTestData("error/file1.go")
 
-func Func1() {}
-`
-
-				code2 := `package other
-
-func Func2() {}
-`
+				code2 := testutil.ReadTestData("error/file2.go")
 
 				os.WriteFile(file1, []byte(code1), 0644)
 				os.WriteFile(file2, []byte(code2), 0644)
@@ -312,11 +246,11 @@ func Func2() {}
 		// Test 7: Circular Dependency
 		{
 			name: "CircularDependency_DependencyGraph",
-			tool: "get_dependency_graph",
+			tool: "go_get_dependency_graph",
 			args: map[string]any{
 				"package_path":       "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_transitive": false,
-				"Cwd":                goplsMcpDir,
+				"Cwd":                globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				// Should successfully analyze even with complex dependencies
@@ -328,7 +262,7 @@ func Func2() {}
 			name: "LargeFileWithErrors_DiagnosticsOnLargeFile",
 			tool: "go_diagnostics",
 			args: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 			assertion: func(t *testing.T, content string) {
 				// Should handle large files efficiently
@@ -358,7 +292,7 @@ func Func2() {}
 			}
 
 			// Get and truncate content for logging
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenErrorScenarios)
 			t.Logf("%s result:\n%s", tc.tool, testutil.TruncateString(content, 2000))
 
 			// Run assertion

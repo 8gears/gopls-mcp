@@ -3,7 +3,7 @@ title: Reference
 sidebar:
   order: 1
 ---
-### `list_modules`
+### `go_list_modules`
 
 > List current module and direct dependencies only. Returns module paths only (no packages). By default, transitive dependencies are excluded. Set direct_only=false to show all dependencies including transitive ones. Use this to understand the module structure before exploring packages.
 
@@ -17,7 +17,7 @@ LLM should use this MCP tool to retrieve a well-structured roadmap for dependenc
 LLM should be careful that the third-party modules might be huge depending on current modules.
 
 
-### `list_module_packages`
+### `go_list_module_packages`
 
 > List all packages in a given module. Returns package names and optionally documentation. Use this to discover packages within a module before exploring symbols.
 
@@ -40,9 +40,9 @@ LLM should use this tool to get package information instead of reading project f
 It preserves the LLM's attention context, eliminates textual analysis hallucinations, and significantly saves tokens.
 
 
-### `list_package_symbols`
+### `go_list_package_symbols`
 
-> List all defined symbols in a package. Returns symbols with optional documentation and function bodies. Use this to understand a package's API, find functions, or learn implementation patterns.
+> List all exported symbols (types, functions, constants, variables) in a package. Returns Symbol objects with name, kind, signature, receiver, documentation, and optional bodies. Use include_docs=true for documentation and include_bodies=true for function implementations. Use this to explore a package's API surface before diving into specific symbols with get_package_symbol_detail.
 
 list_package_symbols allows the LLM to get all exported symbols of a given package.
 
@@ -63,7 +63,7 @@ LLM should use this tool to get symbol information instead of reading package fi
 It preserves the LLM's attention context, eliminates textual analysis hallucinations, and significantly saves tokens.
 
 
-### `get_package_symbol_detail`
+### `go_get_package_symbol_detail`
 
 > Get detailed symbol information from a package. Returns Symbol objects with name, kind, signature, receiver (for methods), parent (for fields), documentation, and optional bodies. Symbol filters are REQUIRED - provide symbol_filters to retrieve specific symbols by name and receiver (e.g., [{name: "Start", receiver: "*Server"}]). For methods, receiver matching uses exact string match (e.g., "*Server" != "Server"). Use include_docs=true for documentation and include_bodies=true for function implementations. Use list_package_symbols to get all symbols in a package.
 
@@ -82,25 +82,6 @@ The frequent symbol finding populates the context.
 (3) Low Precision: The understanding relies on textual matching, which often misses cross-file definitions or struct methods.
 
 LLM should use this tool to get symbol details of package instead of reading package files manually.
-
-
-### `go_workspace`
-
-> Get workspace information (module path, type). Use this for initial project overview.
-
-go_workspace allows the LLM to understand the current workspace configuration.
-
-This MCP tool offers a quick overview of the module path and build settings.
-
-Standard LLM workflows might try to read go.mod or go.work files to understand the workspace.
-The pain points of this procedure are:
-
-(1) Attention Dilution: Reading configuration files might distract from the main code.
-(2) Token Cost: Configuration files can be verbose.
-
-This tool offers a concise summary of the workspace.
-
-LLM should use this tool to get an initial understanding of the project structure.
 
 
 ### `go_diagnostics`
@@ -195,7 +176,7 @@ OUTPUT:
   Returns both:
   - references: List of reference locations (file, line, column)
   - symbols: Rich symbol information (signature, documentation, snippet) for the referenced symbol
-		
+
 
 ### `go_dryrun_rename_symbol`
 
@@ -213,25 +194,6 @@ It's fast and semantically correct.
 
 LLM should use this tool to evaluate renaming impacts and based on the results to rename,
 instead of trying to analyze and change the findings by itself.
-
-
-### `go_file_context`
-
-> Get file metadata (package name, path). FAST: uses cached metadata with minimal IO. Use this first when you only need package info, then use go_read_file only if you need the actual file content.
-
-go_file_context allows the LLM to get metadata about a file without reading its full content.
-
-This MCP tool offers a low-cost way to check package names and paths.
-
-Standard LLM workflows often read the full file just to check the package declaration.
-The pain points of this procedure are:
-
-(1) Token Cost: Reading the full file is wasteful if only metadata is needed.
-(2) Attention Dilution: Full content crowds the context window.
-
-This tool provides just the essential metadata.
-
-LLM should use this tool to verify file identity before reading it fully.
 
 
 ### `go_implementation`
@@ -312,7 +274,7 @@ EXAMPLES:
 
 ### `go_read_file`
 
-> Read file content through gopls. SLOWER: reads full file from disk. Use go_file_context first for quick metadata check, then use this only when you need to see actual code or implementation details. Note: unsaved editor changes not included.
+> Read file content through gopls. SLOWER: reads full file from disk. Use this when you need to see actual code or implementation details. Note: unsaved editor changes not included.
 
 go_read_file offers a lightweight file reading without involving disk IO.
 
@@ -349,7 +311,7 @@ Example: To find definition of "Add" function call in main.go:
 }
 
 
-### `get_call_hierarchy`
+### `go_get_call_hierarchy`
 
 > Get the call hierarchy for a function using semantic location (symbol name, package, scope). Returns both incoming calls (what functions call this one) and outgoing calls (what functions this one calls). Use this to understand code flow, debug call chains, and trace execution paths through the codebase. REPLACES: grep + manual file reading for call graph analysis.
 
@@ -395,7 +357,7 @@ EXAMPLE:
   }
 
 
-### `analyze_workspace`
+### `go_analyze_workspace`
 
 > Analyze the entire workspace to discover packages, entry points, and dependencies. Use this when exploring a new codebase to understand the project structure, find main packages, API endpoints, and get a comprehensive overview of the codebase.
 
@@ -414,7 +376,7 @@ This tool provides a starting point for exploration.
 LLM should use this tool when first encountering a new codebase.
 
 
-### `get_started`
+### `go_get_started`
 
 > Get a beginner-friendly guide to start exploring the Go project. Returns project identity, quick stats, entry points, package categories, and recommended next steps. Use this when you're new to a codebase and want to understand where to start.
 
@@ -433,7 +395,7 @@ This tool provides a structured introduction.
 LLM should use this tool to orient itself and the user.
 
 
-### `get_dependency_graph`
+### `go_get_dependency_graph`
 
 > Get the dependency graph for a package. Returns both dependencies (packages it imports) and dependents (packages that import it). Use this to understand architectural relationships, analyze coupling, and visualize the package's place in the codebase.
 

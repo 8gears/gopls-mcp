@@ -19,7 +19,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 	t.Run("ListModules_NoCwd", func(t *testing.T) {
 		// Use the simple test project
 
-		tool := "list_modules"
+		tool := "go_list_modules"
 		args := map[string]any{
 			"direct_only": true,
 			// Don't provide "cwd" at all - should use default view
@@ -34,7 +34,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 		t.Logf("List modules (no Cwd):\n%s", content)
 
 		// Should find modules from the project directory
@@ -45,7 +45,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 
 	t.Run("ListModules_EmptyStringCwd", func(t *testing.T) {
 
-		tool := "list_modules"
+		tool := "go_list_modules"
 		args := map[string]any{
 			"direct_only": true,
 			"Cwd":         "", // Explicitly pass empty string
@@ -60,7 +60,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 		t.Logf("List modules (empty Cwd string):\n%s", content)
 
 		// Should find modules from the project directory
@@ -71,7 +71,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 
 	t.Run("ListModulePackages_NoCwd", func(t *testing.T) {
 
-		tool := "list_module_packages"
+		tool := "go_list_module_packages"
 		args := map[string]any{
 			// Don't provide "cwd"
 			"include_docs":     false,
@@ -89,7 +89,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 		t.Logf("List module packages (no Cwd):\n%s", content)
 
 		// Should find packages from the project directory
@@ -100,7 +100,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 
 	t.Run("AnalyzeWorkspace_NoCwd", func(t *testing.T) {
 
-		tool := "analyze_workspace"
+		tool := "go_analyze_workspace"
 		args := map[string]any{
 			// Don't provide "cwd"
 		}
@@ -114,7 +114,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 		t.Logf("Analyze workspace (no Cwd):\n%s", content)
 
 		// Should analyze the workspace
@@ -125,7 +125,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 
 	t.Run("GetStarted_NoCwd", func(t *testing.T) {
 
-		tool := "get_started"
+		tool := "go_get_started"
 		args := map[string]any{
 			// Don't provide "cwd"
 		}
@@ -139,7 +139,7 @@ func TestEmptyCwdE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 		t.Logf("Get started (no Cwd):\n%s", content)
 
 		// Should provide getting started guide
@@ -184,7 +184,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 		t.Logf("Diagnostics (no Cwd):\n%s", content)
 
 		// Should return some diagnostic result (even if no errors)
@@ -195,7 +195,7 @@ func main() {
 
 	t.Run("InvalidCwd_DoesNotCrash", func(t *testing.T) {
 
-		tool := "list_modules"
+		tool := "go_list_modules"
 		args := map[string]any{
 			"direct_only": true,
 			"Cwd":         "/nonexistent/directory/that/does/not/exist",
@@ -207,7 +207,7 @@ func main() {
 		if err != nil {
 			t.Logf("Expected error for invalid Cwd: %v", err)
 		} else if res != nil {
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 			t.Logf("Result for invalid Cwd: %s", content)
 
 			// If no error, should mention the issue
@@ -224,10 +224,10 @@ func main() {
 		// Verify that all tools use the same default view when Cwd is not provided
 
 		tools := []string{
-			"list_modules",
-			"list_module_packages",
-			"analyze_workspace",
-			"get_started",
+			"go_list_modules",
+			"go_list_module_packages",
+			"go_analyze_workspace",
+			"go_get_started",
 		}
 
 		results := make(map[string]string)
@@ -236,10 +236,10 @@ func main() {
 			args := map[string]any{} // No Cwd
 
 			// Add required parameters for specific tools
-			if toolName == "list_modules" {
+			if toolName == "go_list_modules" {
 				args["direct_only"] = true
 			}
-			if toolName == "list_module_packages" {
+			if toolName == "go_list_module_packages" {
 				args["include_docs"] = false
 				args["exclude_tests"] = false
 				args["exclude_internal"] = false
@@ -255,7 +255,7 @@ func main() {
 				t.Fatalf("Tool %s returned nil result with no Cwd", toolName)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenEmptyCWD)
 			results[toolName] = content
 
 			// All tools should find the same module

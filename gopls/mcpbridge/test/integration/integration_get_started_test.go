@@ -18,7 +18,7 @@ func TestGetStartedE2E(t *testing.T) {
 	// Start gopls-mcp
 
 	t.Run("GetStartedBasic", func(t *testing.T) {
-		tool := "get_started"
+		tool := "go_get_started"
 		args := map[string]any{
 			"Cwd": projectDir,
 		}
@@ -32,8 +32,10 @@ func TestGetStartedE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenGetStarted)
 		t.Logf("Get Started output:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Should have project identity section
 		if !strings.Contains(content, "## Project") {
@@ -67,7 +69,7 @@ func TestGetStartedE2E(t *testing.T) {
 	})
 
 	t.Run("GetStartedHasCategories", func(t *testing.T) {
-		tool := "get_started"
+		tool := "go_get_started"
 		args := map[string]any{
 			"Cwd": projectDir,
 		}
@@ -81,8 +83,10 @@ func TestGetStartedE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenGetStarted)
 		t.Logf("Get Started categories output:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Should have package categories section
 		if !strings.Contains(content, "## Package Categories") {
@@ -91,7 +95,7 @@ func TestGetStartedE2E(t *testing.T) {
 	})
 
 	t.Run("GetStartedHasEntryPoints", func(t *testing.T) {
-		tool := "get_started"
+		tool := "go_get_started"
 		args := map[string]any{
 			"Cwd": projectDir,
 		}
@@ -105,7 +109,7 @@ func TestGetStartedE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenGetStarted)
 		t.Logf("Get Started entry points output:\n%s", content)
 
 		// Should have entry points section

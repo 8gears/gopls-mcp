@@ -18,7 +18,7 @@ func TestListModulesE2E(t *testing.T) {
 	// Start gopls-mcp
 
 	t.Run("ListModules", func(t *testing.T) {
-		tool := "list_modules"
+		tool := "go_list_modules"
 		args := map[string]any{
 			"direct_only": true,
 			"Cwd":         projectDir,
@@ -33,7 +33,7 @@ func TestListModulesE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListModules)
 		t.Logf("Modules:\n%s", content)
 
 		// Should find the main module
@@ -61,7 +61,7 @@ func TestListModulePackagesE2E(t *testing.T) {
 	// Start gopls-mcp
 
 	t.Run("ListPackagesWithoutDocs", func(t *testing.T) {
-		tool := "list_module_packages"
+		tool := "go_list_module_packages"
 		args := map[string]any{
 			"Cwd":              projectDir,
 			"include_docs":     false,
@@ -79,7 +79,7 @@ func TestListModulePackagesE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListModulePackages)
 		t.Logf("Module packages (no docs):\n%s", content)
 
 		// Should find the main package
@@ -94,7 +94,7 @@ func TestListModulePackagesE2E(t *testing.T) {
 	})
 
 	t.Run("ListPackagesWithDocs", func(t *testing.T) {
-		tool := "list_module_packages"
+		tool := "go_list_module_packages"
 		args := map[string]any{
 			"Cwd":              projectDir,
 			"include_docs":     true,
@@ -112,7 +112,7 @@ func TestListModulePackagesE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListModulePackages)
 		t.Logf("Module packages (with docs):\n%s", testutil.TruncateString(content, 500))
 
 		// Should find the main package
@@ -122,7 +122,7 @@ func TestListModulePackagesE2E(t *testing.T) {
 	})
 
 	t.Run("ListPackagesForSpecificModule", func(t *testing.T) {
-		tool := "list_module_packages"
+		tool := "go_list_module_packages"
 		args := map[string]any{
 			"Cwd":              projectDir,
 			"module_path":      "example.com/simple",
@@ -141,7 +141,7 @@ func TestListModulePackagesE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListModulePackages)
 		t.Logf("Module packages (specific module):\n%s", content)
 
 		// Should find the requested module
@@ -159,7 +159,7 @@ func TestListPackageSymbolsE2E(t *testing.T) {
 	// Start gopls-mcp
 
 	t.Run("ListSymbolsWithoutDocs", func(t *testing.T) {
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"Cwd":            projectDir,
 			"package_path":   "example.com/simple",
@@ -176,7 +176,7 @@ func TestListPackageSymbolsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbols)
 		t.Logf("Package symbols (no docs):\n%s", content)
 
 		// Should mention the package
@@ -196,7 +196,7 @@ func TestListPackageSymbolsE2E(t *testing.T) {
 	})
 
 	t.Run("ListSymbolsWithDocs", func(t *testing.T) {
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"Cwd":            projectDir,
 			"package_path":   "example.com/simple",
@@ -213,7 +213,7 @@ func TestListPackageSymbolsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbols)
 		t.Logf("Package symbols (with docs):\n%s", testutil.TruncateString(content, 500))
 
 		// Should mention the package
@@ -228,7 +228,7 @@ func TestListPackageSymbolsE2E(t *testing.T) {
 	})
 
 	t.Run("ListSymbolsWithBodies", func(t *testing.T) {
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"Cwd":            projectDir,
 			"package_path":   "example.com/simple",
@@ -245,7 +245,7 @@ func TestListPackageSymbolsE2E(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbols)
 		t.Logf("Package symbols (with bodies):\n%s", testutil.TruncateString(content, 500))
 
 		// Should mention the package

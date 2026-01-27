@@ -153,7 +153,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenComplexRenameScenarios)
 		t.Logf("Rename result for exported symbol:\n%s", content)
 
 		// Should mention the rename operation
@@ -256,7 +256,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenComplexRenameScenarios)
 		t.Logf("Rename result with conflict:\n%s", content)
 
 		// Should either error or warn about the conflict
@@ -378,7 +378,7 @@ func ExampleAdd() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenAddNegative)
 		t.Logf("Rename result including test files:\n%s", content)
 
 		// Should show changes in test files
@@ -502,7 +502,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenAddNegative)
 		t.Logf("Rename result for interface method:\n%s", content)
 
 		// Should mention renaming in both interface and implementation
@@ -586,7 +586,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRenameEdgeCases)
 		t.Logf("Rename to unexported:\n%s", content)
 
 		// Tool should handle this - either error or proceed
@@ -663,7 +663,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRenameEdgeCases)
 		t.Logf("Rename with case change:\n%s", content)
 
 		// Should handle the case change
@@ -741,7 +741,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRenameEdgeCases)
 		t.Logf("Rename main function result:\n%s", content)
 
 		// Should handle gracefully (may error or show the rename)

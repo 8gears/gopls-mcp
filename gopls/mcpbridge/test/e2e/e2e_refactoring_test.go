@@ -90,7 +90,7 @@ func TestPerson() {
 		if err != nil {
 			t.Logf("Rename preview failed (expected for temp files): %v", err)
 		} else if res != nil {
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenRefactoringSafeRename)
 			t.Logf("Rename preview:\n%s", testutil.TruncateString(content, 2000))
 
 			// Should show changes across multiple files
@@ -118,7 +118,7 @@ func TestPerson() {
 			t.Fatalf("Failed to find references: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringSafeRename)
 		t.Logf("References to Person:\n%s", content)
 
 		// Should find references in multiple files
@@ -129,7 +129,7 @@ func TestPerson() {
 	t.Run("CallHierarchyBeforeRename", func(t *testing.T) {
 		// Test: Get call hierarchy for Greet method
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "Greet",
@@ -144,7 +144,7 @@ func TestPerson() {
 			t.Fatalf("Failed to get call hierarchy: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringSafeRename)
 		t.Logf("Call hierarchy for Greet:\n%s", content)
 
 		// Should show caller in usage.go
@@ -154,8 +154,6 @@ func TestPerson() {
 
 // TestRefactoring_ExtractFunction tests extract function workflow
 func TestRefactoring_ExtractFunction(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("IdentifyExtractionCandidate", func(t *testing.T) {
 		// Test: Use search to find a complex function that could be extracted
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
@@ -169,7 +167,7 @@ func TestRefactoring_ExtractFunction(t *testing.T) {
 			t.Fatalf("Failed to search: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringExtractFunction)
 		t.Logf("Search for extraction candidate:\n%s", content)
 
 		// Should find the function
@@ -180,10 +178,10 @@ func TestRefactoring_ExtractFunction(t *testing.T) {
 
 	t.Run("AnalyzeFunctionComplexity", func(t *testing.T) {
 		// Test: Get call hierarchy to understand complexity
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -198,7 +196,7 @@ func TestRefactoring_ExtractFunction(t *testing.T) {
 			t.Fatalf("Failed to analyze function: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringExtractFunction)
 		t.Logf("Function complexity analysis:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should show what the function calls
@@ -208,11 +206,9 @@ func TestRefactoring_ExtractFunction(t *testing.T) {
 
 // TestRefactoring_MoveSymbol tests moving symbols between files/packages
 func TestRefactoring_MoveSymbol(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindAllUsagesBeforeMove", func(t *testing.T) {
 		// Test: Find all usages to understand move impact
-		handlersPath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+		handlersPath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_symbol_references",
@@ -229,7 +225,7 @@ func TestRefactoring_MoveSymbol(t *testing.T) {
 			t.Fatalf("Failed to find usages: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringMoveSymbol)
 		t.Logf("All usages before move:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should help understand impact of moving the symbol
@@ -239,14 +235,12 @@ func TestRefactoring_MoveSymbol(t *testing.T) {
 
 // TestRefactoring_ChangeSignature tests changing function signatures
 func TestRefactoring_ChangeSignature(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindAllCallers", func(t *testing.T) {
 		// Test: Before changing signature, find all callers
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -261,7 +255,7 @@ func TestRefactoring_ChangeSignature(t *testing.T) {
 			t.Fatalf("Failed to find callers: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringChangeSignature)
 		t.Logf("All callers before signature change:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should show which files need updating
@@ -271,8 +265,6 @@ func TestRefactoring_ChangeSignature(t *testing.T) {
 
 // TestRefactoring_InlineFunction tests inlining function workflows
 func TestRefactoring_InlineFunction(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindInlineCandidates", func(t *testing.T) {
 		// Test: Search for small functions that could be inlined
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
@@ -286,7 +278,7 @@ func TestRefactoring_InlineFunction(t *testing.T) {
 			t.Fatalf("Failed to search for candidates: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringInlineFunction)
 		t.Logf("Inline function candidates:\n%s", content)
 
 		// Should find utility functions that could be inlined
@@ -297,7 +289,7 @@ func TestRefactoring_InlineFunction(t *testing.T) {
 
 	t.Run("AnalyzeUsagePattern", func(t *testing.T) {
 		// Test: Analyze how a function is used to determine if inlining is safe
-		testutilPath := filepath.Join(goplsMcpDir, "test", "testutil", "assertions.go")
+		testutilPath := filepath.Join(globalGoplsMcpDir, "test", "testutil", "assertions.go")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_symbol_references",
@@ -314,7 +306,7 @@ func TestRefactoring_InlineFunction(t *testing.T) {
 			t.Fatalf("Failed to analyze usage: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringInlineFunction)
 		t.Logf("Usage pattern for inlining decision:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should show how widely the function is used
@@ -324,23 +316,21 @@ func TestRefactoring_InlineFunction(t *testing.T) {
 
 // TestRefactoring_MultiFileChange tests coordinating changes across multiple files
 func TestRefactoring_MultiFileChange(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("TraceDependencyChain", func(t *testing.T) {
 		// Test: Use dependency graph to understand ripple effects
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_dependency_graph",
+			Name: "go_get_dependency_graph",
 			Arguments: map[string]any{
 				"package_path":       "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_transitive": false,
-				"Cwd":                goplsMcpDir,
+				"Cwd":                globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to trace dependencies: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringMultiFileChange)
 		t.Logf("Dependency chain for refactoring:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should show which packages depend on core
@@ -353,14 +343,14 @@ func TestRefactoring_MultiFileChange(t *testing.T) {
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_diagnostics",
 			Arguments: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to run diagnostics: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringMultiFileChange)
 		t.Logf("Pre-refactoring health check:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should successfully analyze the codebase
@@ -372,11 +362,9 @@ func TestRefactoring_MultiFileChange(t *testing.T) {
 
 // TestRefactoring_InterfaceExtraction tests extracting interfaces
 func TestRefactoring_InterfaceExtraction(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("IdentifyInterfaceCandidates", func(t *testing.T) {
 		// Test: Use implementation finder to identify interface opportunities
-		handlersPath := filepath.Join(goplsMcpDir, "core", "handlers.go")
+		handlersPath := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_implementation",
@@ -393,7 +381,7 @@ func TestRefactoring_InterfaceExtraction(t *testing.T) {
 			t.Fatalf("Failed to find implementations: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringInterfaceExtraction)
 		t.Logf("Interface candidates:\n%s", content)
 
 		// May find opportunities for interface extraction
@@ -403,19 +391,19 @@ func TestRefactoring_InterfaceExtraction(t *testing.T) {
 	t.Run("AnalyzeCommonMethods", func(t *testing.T) {
 		// Test: List symbols to find common method patterns
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 		})
 		if err != nil {
 			t.Fatalf("Failed to list symbols: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringInterfaceExtraction)
 		t.Logf("Common methods for interface:\n%s", testutil.TruncateString(content, 3000))
 
 		// Should show available methods
@@ -425,8 +413,6 @@ func TestRefactoring_InterfaceExtraction(t *testing.T) {
 
 // TestRefactoring_SafeDelete tests safe deletion of unused code
 func TestRefactoring_SafeDelete(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FindUnusedSymbols", func(t *testing.T) {
 		// Test: Find symbols with no references (candidates for deletion)
 		// Note: This is a heuristic test
@@ -443,7 +429,7 @@ func TestRefactoring_SafeDelete(t *testing.T) {
 			t.Fatalf("Failed to search for unused symbols: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringSafeDelete)
 		t.Logf("Search for potentially unused symbols:\n%s", content)
 
 		// May or may not find unused symbols
@@ -459,7 +445,7 @@ func TestRefactoring_SafeDelete(t *testing.T) {
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "TruncateString",
-					"context_file": filepath.Join(goplsMcpDir, "test", "testutil", "assertions.go"),
+					"context_file": filepath.Join(globalGoplsMcpDir, "test", "testutil", "assertions.go"),
 					"kind":         "function",
 					"line_hint":    20,
 				},
@@ -469,7 +455,7 @@ func TestRefactoring_SafeDelete(t *testing.T) {
 			t.Fatalf("Failed to check references: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRefactoringSafeDelete)
 		t.Logf("Reference check before deletion:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should show all usages
@@ -479,8 +465,6 @@ func TestRefactoring_SafeDelete(t *testing.T) {
 
 // TestRefactoring_RealWorldScenario tests a complete refactoring workflow
 func TestRefactoring_RealWorldScenario(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("CompleteRefactoringWorkflow", func(t *testing.T) {
 		// Scenario: Rename a function across the codebase
 
@@ -495,12 +479,12 @@ func TestRefactoring_RealWorldScenario(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Step 1 failed: %v", err)
 		}
-		t.Logf("Step 1: Found function\n%s", testutil.ResultText(res1))
+		t.Logf("Step 1: Found function\n%s", testutil.ResultText(t, res1, testutil.GoldenRefactoringRealWorldScenario))
 
 		// Step 2: Find all callers (incoming call hierarchy)
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 		res2, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -514,7 +498,7 @@ func TestRefactoring_RealWorldScenario(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Step 2 failed: %v", err)
 		}
-		t.Logf("Step 2: Found callers\n%s", testutil.TruncateString(testutil.ResultText(res2), 1000))
+		t.Logf("Step 2: Found callers\n%s", testutil.TruncateString(testutil.ResultText(t, res2, testutil.GoldenRefactoringRealWorldScenario), 1000))
 
 		// Step 3: Find symbol references
 		res3, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
@@ -531,7 +515,7 @@ func TestRefactoring_RealWorldScenario(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Step 3 failed: %v", err)
 		}
-		t.Logf("Step 3: Found references\n%s", testutil.TruncateString(testutil.ResultText(res3), 1000))
+		t.Logf("Step 3: Found references\n%s", testutil.TruncateString(testutil.ResultText(t, res3, testutil.GoldenRefactoringRealWorldScenario), 1000))
 
 		// Step 4: Preview rename (DRY RUN)
 		// Find the line number where handleGoDefinition is defined
@@ -567,7 +551,7 @@ func TestRefactoring_RealWorldScenario(t *testing.T) {
 		if err != nil {
 			t.Logf("Step 4: Rename preview returned error (may be expected): %v", err)
 		} else {
-			t.Logf("Step 4: Rename preview\n%s", testutil.TruncateString(testutil.ResultText(res4), 1000))
+			t.Logf("Step 4: Rename preview\n%s", testutil.TruncateString(testutil.ResultText(t, res4, testutil.GoldenRefactoringRealWorldScenario), 1000))
 		}
 
 		// Success: Completed refactoring analysis workflow

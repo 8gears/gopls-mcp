@@ -24,6 +24,10 @@ import (
 var globalSession *mcp.ClientSession
 var globalCtx context.Context
 
+// Global shared path to the gopls-mcp directory.
+// This is the parent directory of the e2e test directory.
+var globalGoplsMcpDir string
+
 // TestMain sets up the shared MCP server before running any tests in the e2e package.
 // This function runs ONCE for the entire e2e test package, not per test file.
 //
@@ -45,6 +49,9 @@ func TestMain(m *testing.M) {
 		fmt.Printf("Failed to build gopls-mcp: %v\n%s", err, output)
 		os.Exit(1)
 	}
+
+	// Initialize the shared gopls-mcp directory path (parent of e2e test directory)
+	globalGoplsMcpDir, _ = filepath.Abs("../..")
 
 	// Ensure the binary has executable permissions
 	if err := os.Chmod(goplsMcpPath, 0755); err != nil {

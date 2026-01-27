@@ -45,7 +45,7 @@ func TestFileWatchingE2E(t *testing.T) {
 	t.Log("=== SCENARIO 1: User asks 'what functions are in this package?' ===")
 	t.Log("Calling get_package_symbol_detail to get initial state...")
 
-	tool := "get_package_symbol_detail"
+	tool := "go_get_package_symbol_detail"
 	args := map[string]any{
 		"package_path": "example.com/simple",
 		"symbol_filters": []any{
@@ -60,7 +60,7 @@ func TestFileWatchingE2E(t *testing.T) {
 		t.Fatalf("Failed to call tool %s: %v", tool, err)
 	}
 
-	baselineContent := testutil.ResultText(res)
+	baselineContent := testutil.ResultText(t, res, testutil.GoldenFileWatching)
 	t.Logf("Initial package state:\n%s", baselineContent)
 
 	// Verify we can see the original functions
@@ -148,7 +148,7 @@ func TestFileWatchingE2E(t *testing.T) {
 		t.Fatalf("Failed to call tool %s after modification: %v", tool, err)
 	}
 
-	updatedContent := testutil.ResultText(res2)
+	updatedContent := testutil.ResultText(t, res2, testutil.GoldenFileWatching)
 	t.Logf("Updated package state:\n%s", updatedContent)
 
 	// ========================================

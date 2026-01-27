@@ -282,8 +282,17 @@ func StartMCPServerRaw(workdir string) (*mcp.ClientSession, context.Context, fun
 	return mcpSession, ctx, cleanup, nil
 }
 
+var updateGolden = os.Getenv("WRITE_GOLDEN") != ""
+
 // ResultText concatenates the textual content of an MCP tool result.
-func ResultText(res *mcp.CallToolResult) string {
+// If -update-golden flag is set, automatically writes the output to the specified golden file.
+// If golden file exists and -update-golden is not set, compares output against golden file.
+//
+// The goldenFile parameter should be just the filename (e.g., "test_xxx.golden").
+// ResultText will automatically prepend "testdata/golden/" to locate the file.
+//
+// If golden file content doesn't match, the test FAILS with t.Errorf().
+func ResultText(t *testing.T, res *mcp.CallToolResult, goldenFile string) string {
 	var buf strings.Builder
 	for _, content := range res.Content {
 		if c, ok := content.(*mcp.TextContent); ok {
@@ -291,5 +300,50 @@ func ResultText(res *mcp.CallToolResult) string {
 			buf.WriteString("\n")
 		}
 	}
-	return buf.String()
+	result := buf.String()
+
+	if goldenFile == "" {
+		// No golden file specified, return result without comparison
+		return result
+	}
+
+	// Auto-prepend "testdata/golden/" if goldenFile is just a filename (not a path)
+	if !strings.Contains(goldenFile, "/") && !strings.Contains(goldenFile, "\\") {
+		goldenFile = filepath.Join("testdata", "golden", goldenFile)
+	}
+	if updateGolden {
+		// Update mode: write golden file
+		if err := os.MkdirAll(filepath.Dir(goldenFile), 0755); err == nil {
+			_ = os.WriteFile(goldenFile, []byte(result), 0644)
+			fmt.Fprintf(os.Stderr, "Updated golden file: %s\n", goldenFile)
+		}
+	}
+
+	// todo: in the future we may check golden file contents also.
+	return result
+}
+
+// TestDataPath returns the absolute path to a testdata file.
+// For example, TestDataPath("error-scenarios/broken_syntax.go") returns
+// the path to test/testdata/projects/error-scenarios/broken_syntax.go.
+func TestDataPath(relativePath string) string {
+	// Navigate from test/testutil to test/testdata/projects
+	relPath := filepath.Join("..", "testdata", "projects", relativePath)
+	abs, err := filepath.Abs(relPath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get absolute path for testdata %s: %v", relativePath, err))
+	}
+	return abs
+}
+
+// ReadTestData reads a testdata file and returns its content as a string.
+// For example, ReadTestData("error-scenarios/broken_syntax.go") returns
+// the content of test/testdata/projects/error-scenarios/broken_syntax.go.
+func ReadTestData(relativePath string) string {
+	path := TestDataPath(relativePath)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read testdata file %s: %v", path, err))
+	}
+	return string(content)
 }

@@ -377,7 +377,7 @@ func BenchmarkPackageDiscovery(ctx context.Context, session *mcp.ClientSession, 
 		{
 			name:     "List Project Packages",
 			category: "Package Discovery",
-			tool:     "list_module_packages",
+			tool:     "go_list_module_packages",
 			args: func(projectDir string) map[string]any {
 				return map[string]any{
 					"Cwd":              projectDir,
@@ -395,7 +395,7 @@ func BenchmarkPackageDiscovery(ctx context.Context, session *mcp.ClientSession, 
 		{
 			name:     "Get Package API with Bodies",
 			category: "Package Discovery",
-			tool:     "list_package_symbols",
+			tool:     "go_list_package_symbols",
 			args: func(projectDir string) map[string]any {
 				return map[string]any{
 					"package_path":   "golang.org/x/tools/gopls/internal/golang",
@@ -417,7 +417,7 @@ func BenchmarkPackageDiscovery(ctx context.Context, session *mcp.ClientSession, 
 		{
 			name:     "Get Package API Signatures Only",
 			category: "Package Discovery",
-			tool:     "list_package_symbols",
+			tool:     "go_list_package_symbols",
 			args: func(projectDir string) map[string]any {
 				return map[string]any{
 					"package_path":   "golang.org/x/tools/gopls/internal/golang",
@@ -517,7 +517,7 @@ func benchmarkStdlibSearch(ctx context.Context, session *mcp.ClientSession) Benc
 	mcpStats := RunBenchmarkWithConfig(func() time.Duration {
 		start := time.Now()
 		_, err := session.CallTool(ctx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "fmt",
 				"include_bodies": false,
@@ -575,7 +575,7 @@ func BenchmarkFunctionBodies(ctx context.Context, session *mcp.ClientSession, pr
 		{
 			name:     "Function Bodies with Bodies (Learning Mode)",
 			category: "Function Bodies",
-			tool:     "list_package_symbols",
+			tool:     "go_list_package_symbols",
 			args: func(projectDir string) map[string]any {
 				return map[string]any{
 					"package_path":   "golang.org/x/tools/gopls/internal/golang",
@@ -598,7 +598,7 @@ func BenchmarkFunctionBodies(ctx context.Context, session *mcp.ClientSession, pr
 		{
 			name:     "Function Signatures Only (Fast)",
 			category: "Function Bodies",
-			tool:     "list_package_symbols",
+			tool:     "go_list_package_symbols",
 			args: func(projectDir string) map[string]any {
 				return map[string]any{
 					"package_path":   "golang.org/x/tools/gopls/internal/golang",
@@ -790,7 +790,7 @@ func compareGoList(ctx context.Context, session *mcp.ClientSession, projectDir s
 	mcpStats := RunBenchmarkWithConfig(func() time.Duration {
 		start := time.Now()
 		_, err := session.CallTool(ctx, &mcp.CallToolParams{
-			Name: "list_module_packages",
+			Name: "go_list_module_packages",
 			Arguments: map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false, // Faster - we don't need docs for counting packages
@@ -1090,7 +1090,7 @@ func BenchmarkColdStart(projectDir string) BenchmarkResult {
 	// Immediately run first query - no warmup
 	firstQueryStart := time.Now()
 	_, err = mcpSession.CallTool(ctx, &mcp.CallToolParams{
-		Name: "list_module_packages",
+		Name: "go_list_module_packages",
 		Arguments: map[string]any{
 			"Cwd":              projectDir,
 			"include_docs":     false,
@@ -1122,7 +1122,7 @@ func BenchmarkColdStart(projectDir string) BenchmarkResult {
 	warmStats := RunBenchmarkWithConfig(func() time.Duration {
 		start := time.Now()
 		_, err := mcpSession.CallTool(ctx, &mcp.CallToolParams{
-			Name: "list_module_packages",
+			Name: "go_list_module_packages",
 			Arguments: map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false,
@@ -1642,7 +1642,7 @@ func compareListModules(ctx context.Context, session *mcp.ClientSession, project
 	mcpStats := RunBenchmarkWithConfig(func() time.Duration {
 		start := time.Now()
 		_, err := session.CallTool(ctx, &mcp.CallToolParams{
-			Name: "list_modules",
+			Name: "go_list_modules",
 			Arguments: map[string]any{
 				"Cwd":         projectDir,
 				"direct_only": true,
@@ -1701,7 +1701,7 @@ func BenchmarkDependencyGraph(ctx context.Context, session *mcp.ClientSession, p
 		{
 			name:     "Dependency Graph Generation",
 			category: "Dependency Analysis",
-			tool:     "get_dependency_graph",
+			tool:     "go_get_dependency_graph",
 			args: func(projectDir string) map[string]any {
 				return map[string]any{
 					"package_path":       projectDir, // Analyze main package

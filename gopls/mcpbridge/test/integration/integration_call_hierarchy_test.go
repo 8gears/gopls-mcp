@@ -18,7 +18,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
 		// Get call hierarchy for main function (which calls helperA)
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -34,8 +34,10 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyBasicBothDirections)
 		t.Logf("Call hierarchy (both directions):\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// Verify structure
 		requiredStrings := []string{
@@ -59,7 +61,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
 		// Get call hierarchy for helperA (which is called by main)
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "helperA",
@@ -75,7 +77,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyBasicIncomingOnly)
 		t.Logf("Call hierarchy (incoming only):\n%s", content)
 
 		// Should show that helperA is called by main
@@ -94,7 +96,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
 		// Get call hierarchy for main (outgoing only)
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -110,7 +112,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyBasicOutgoingOnly)
 		t.Logf("Call hierarchy (outgoing only):\n%s", content)
 
 		// Should show that main calls helperA and helperB
@@ -123,7 +125,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
 		// Get call hierarchy without specifying direction (should default to "both")
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -139,7 +141,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyBasicDefaultDirection)
 		t.Logf("Call hierarchy (default direction):\n%s", content)
 
 		// Should show both incoming and outgoing
@@ -158,7 +160,7 @@ func TestGetCallHierarchy_ComplexCallGraph(t *testing.T) {
 		projectDir := createProjectWithMultipleCallers(t)
 
 		// sharedFunc is called by both funcA and funcB
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "sharedFunc",
@@ -174,7 +176,7 @@ func TestGetCallHierarchy_ComplexCallGraph(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyComplexMultipleCallers)
 		t.Logf("Multiple callers:\n%s", content)
 
 		// Should show both funcA and funcB calling sharedFunc
@@ -191,7 +193,7 @@ func TestGetCallHierarchy_ComplexCallGraph(t *testing.T) {
 
 		// main calls funcA, which calls funcB, which calls funcC
 		// Check outgoing calls from funcA
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "funcA",
@@ -207,7 +209,7 @@ func TestGetCallHierarchy_ComplexCallGraph(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyComplexCallChain)
 		t.Logf("Call chain:\n%s", content)
 
 		// funcA should call funcB
@@ -223,7 +225,7 @@ func TestGetCallHierarchy_ErrorHandling(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
 		// Try to get call hierarchy for a position that's not a function
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -239,7 +241,7 @@ func TestGetCallHierarchy_ErrorHandling(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyError)
 		t.Logf("Invalid position result:\n%s", content)
 
 		// Should handle gracefully with appropriate message
@@ -251,7 +253,7 @@ func TestGetCallHierarchy_ErrorHandling(t *testing.T) {
 	t.Run("NonExistentFile", func(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -276,7 +278,7 @@ func TestGetCallHierarchy_OutputFormat(t *testing.T) {
 	projectDir := createSimpleProjectWithCalls(t)
 
 	t.Run("OutputStructure", func(t *testing.T) {
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -292,7 +294,7 @@ func TestGetCallHierarchy_OutputFormat(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyOutputFormat)
 		t.Logf("Output format:\n%s", content)
 
 		// Verify key sections exist
@@ -430,7 +432,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 		projectDir := createProjectWithStructMethods(t)
 
 		// Test call hierarchy for a method on a struct
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "Add",
@@ -446,7 +448,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyStructMethodsValue)
 		t.Logf("Value receiver method incoming calls:\n%s", content)
 
 		// main calls counter.Add
@@ -459,7 +461,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 		projectDir := createProjectWithStructMethods(t)
 
 		// Test pointer receiver method
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "Increment",
@@ -475,7 +477,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyStructMethodsPointer)
 		t.Logf("Pointer receiver method incoming calls:\n%s", content)
 
 		// main calls counter.Increment
@@ -488,7 +490,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 		projectDir := createProjectWithStructMethods(t)
 
 		// Test that main calls methods
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -504,7 +506,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyStructMethodsMethodCalls)
 		t.Logf("Method calling another method:\n%s", content)
 
 		// main should call Add and Increment methods
@@ -540,7 +542,7 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 		}
 
 		// Check outgoing calls from main (in main.go) to functions in helpers.go
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -549,6 +551,7 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 				"line_hint":    3,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -556,21 +559,15 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyMultipleFilesCrossFile)
 		t.Logf("Cross-file calls:\n%s", content)
 
 		// main calls functions in helpers.go
-		// NOTE: This is a known gopls limitation - cross-file outgoing call hierarchy
-		// may not work reliably in temporary directories or newly created views.
-		// The test verifies the tool doesn't crash and provides useful output.
-		if strings.Contains(content, "HelperFunc1") || strings.Contains(content, "helperFunc1") {
-			t.Log("✓ Found cross-file calls (known gopls limitation when not found)")
-		} else {
-			t.Log("Note: Cross-file outgoing calls not found (known gopls limitation for temp directories)")
+		if !strings.Contains(content, "HelperFunc1") {
+			t.Errorf("Expected to find 'HelperFunc1' in outgoing calls from main")
 		}
-		// Verify file path is mentioned
-		if !strings.Contains(content, "helpers.go") {
-			t.Log("Note: helpers.go not mentioned in output (expected for known limitation)")
+		if !strings.Contains(content, "HelperFunc2") {
+			t.Errorf("Expected to find 'HelperFunc2' in outgoing calls from main")
 		}
 	})
 
@@ -589,7 +586,7 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 		}
 
 		// Check calls from main package to another package
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -598,6 +595,7 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 				"line_hint":    5,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -605,17 +603,15 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyMultipleFilesCrossPackage)
 		t.Logf("Cross-package calls:\n%s", content)
 
 		// main calls functions from the other package
-		// NOTE: This is a known gopls limitation - cross-package outgoing call hierarchy
-		// may not work reliably in temporary directories or newly created views.
-		// The test verifies the tool doesn't crash and provides useful output.
-		if strings.Contains(content, "OtherPackageFunc") || strings.Contains(content, "otherPackageFunc") {
-			t.Log("✓ Found cross-package calls (known gopls limitation when not found)")
-		} else {
-			t.Log("Note: Cross-package outgoing calls not found (known gopls limitation for temp directories)")
+		if !strings.Contains(content, "OtherPackageFunc") {
+			t.Errorf("Expected to find 'OtherPackageFunc' in outgoing calls from main")
+		}
+		if !strings.Contains(content, "HelperFunc") {
+			t.Errorf("Expected to find 'HelperFunc' in outgoing calls from main")
 		}
 	})
 }
@@ -626,7 +622,7 @@ func TestGetCallHierarchy_MultipleCallSites(t *testing.T) {
 		projectDir := createProjectWithMultipleCallSites(t)
 
 		// sharedFunc is called 3 times by main
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "sharedFunc",
@@ -642,7 +638,7 @@ func TestGetCallHierarchy_MultipleCallSites(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyMultipleCallsSameCaller)
 		t.Logf("Multiple call sites:\n%s", content)
 
 		// Should show main calling sharedFunc
@@ -661,7 +657,7 @@ func TestGetCallHierarchy_MultipleCallSites(t *testing.T) {
 		projectDir := createProjectWithMultipleCallSites(t)
 
 		// helperFunc is called by both main and processFunc
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "helperFunc",
@@ -677,7 +673,7 @@ func TestGetCallHierarchy_MultipleCallSites(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyMultipleCallsDifferent)
 		t.Logf("Different callers:\n%s", content)
 
 		// Should show both main and processFunc calling helperFunc
@@ -699,7 +695,7 @@ func TestGetCallHierarchy_StdlibCalls(t *testing.T) {
 		projectDir := createSimpleProjectWithCalls(t)
 
 		// Check outgoing calls from helperA which calls fmt.Println
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "helperA",
@@ -715,7 +711,7 @@ func TestGetCallHierarchy_StdlibCalls(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyStdlibCalls)
 		t.Logf("Stdlib outgoing calls:\n%s", content)
 
 		// helperA calls fmt.Println
@@ -734,7 +730,7 @@ func TestGetCallHierarchy_InterfaceMethods(t *testing.T) {
 		projectDir := createProjectWithInterfaces(t)
 
 		// Check calls to interface method - Process method is on line 11
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "Process",
@@ -750,7 +746,7 @@ func TestGetCallHierarchy_InterfaceMethods(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchyInterface)
 		t.Logf("Interface method calls:\n%s", content)
 
 		// main calls doWork which calls the interface method
@@ -765,7 +761,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 		projectDir := createProjectWithRecursion(t)
 
 		// Check outgoing calls from factorial (which calls itself)
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "factorial",
@@ -781,7 +777,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchySpecialCasesRecursive)
 		t.Logf("Recursive function calls:\n%s", content)
 
 		// factorial should call itself
@@ -794,7 +790,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 		projectDir := createProjectWithDefer(t)
 
 		// Check outgoing calls from process (which has a deferred call)
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "process",
@@ -810,7 +806,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchySpecialCasesDefer)
 		t.Logf("Deferred calls:\n%s", content)
 
 		// process calls cleanup via defer
@@ -823,7 +819,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 		projectDir := createProjectWithGoroutines(t)
 
 		// Check outgoing calls from main which spawns a goroutine
-		tool := "get_call_hierarchy"
+		tool := "go_get_call_hierarchy"
 		args := map[string]any{
 			"locator": map[string]any{
 				"symbol_name":  "main",
@@ -839,7 +835,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenCallHierarchySpecialCasesGoroutine)
 		t.Logf("Goroutine calls:\n%s", content)
 
 		// main calls worker in a goroutine

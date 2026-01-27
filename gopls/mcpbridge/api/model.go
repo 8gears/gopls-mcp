@@ -12,13 +12,6 @@ type IListModules struct {
 
 	// Cwd is the current working directory (used to locate go.mod and project context).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the current working directory to find the go.mod file (default: session view)"`
-
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // IListModulePackages provides parameters for listing packages in a module.
@@ -42,12 +35,6 @@ type IListModulePackages struct {
 	TopLevelOnly *bool `json:"top_level_only" jsonschema:"whether to include only top-level packages (default: false)"`
 	// Cwd is the current working directory (used to locate go.mod and project context).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the current working directory to find the go.mod file (default: session view)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // IListPackageSymbols provides parameters for listing symbols in a package.
@@ -64,24 +51,12 @@ type IListPackageSymbols struct {
 	IncludeBodies *bool `json:"include_bodies" jsonschema:"whether to include function implementations (default: false)"`
 	// Cwd is the current working directory (used to locate go.mod and project context).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the current working directory to find the go.mod file (default: session view)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // IGetStarted provides parameters for getting started with a Go project.
 type IGetStarted struct {
 	// Cwd is the current working directory (used to locate go.mod and project context).
 	Cwd string `json:"Cwd,omitempty" jsonschema:"the current working directory (default: session view)"`
-	// MaxResponseSize overrides the global maxResponseTokens for this request.
-	// - 0 or not set: use global config
-	// - negative: no limit (returns full response)
-	// - positive: use this specific limit (in characters)
-	// Use with caution: large responses may exceed token limits.
-	MaxResponseSize int `json:"max_response_size,omitempty" jsonschema:"override response size limit (0=global, -1=unlimited, positive=specific limit in chars)"`
 }
 
 // ===== Output types for MCP tools =====
@@ -158,8 +133,10 @@ type ProjectIdentity struct {
 	Type string `json:"type" jsonschema:"project type"`
 	// Root is the root directory of the project.
 	Root string `json:"root" jsonschema:"project root directory"`
-	// GoVersion is the Go version used in the project.
-	GoVersion string `json:"go_version,omitempty" jsonschema:"Go version"`
+	// GoVersion is the Go version from go.mod (minimum required version).
+	GoVersion string `json:"go_version,omitempty" jsonschema:"Go version from go.mod"`
+	// GoRuntimeVersion is the actual Go runtime version being used by gopls.
+	GoRuntimeVersion string `json:"go_runtime_version,omitempty" jsonschema:"Actual Go runtime version"`
 	// Description is a brief description of the project.
 	Description string `json:"description,omitempty" jsonschema:"project description"`
 }
@@ -338,24 +315,3 @@ type Package struct {
 	Symbols []Symbol `json:"symbols,omitempty" jsonschema:"the symbols in a package"`
 }
 
-// ===== ResponseSizeSetter implementations =====
-
-// GetMaxResponseSize implements ResponseSizeSetter for IListModules.
-func (i IListModules) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IListModulePackages.
-func (i IListModulePackages) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IListPackageSymbols.
-func (i IListPackageSymbols) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}
-
-// GetMaxResponseSize implements ResponseSizeSetter for IGetStarted.
-func (i IGetStarted) GetMaxResponseSize() int {
-	return i.MaxResponseSize
-}

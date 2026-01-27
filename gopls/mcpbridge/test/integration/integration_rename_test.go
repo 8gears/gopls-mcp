@@ -90,8 +90,10 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRenameSymbolStrong)
 		t.Logf("Rename result:\n%s", content)
+
+		// Compare against golden file (documentation + regression check)
 
 		// === STRONG ASSERTIONS ===
 
@@ -243,7 +245,7 @@ func AnotherFunc() int {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRenameSymbolStrong)
 		t.Logf("Multi-file rename result:\n%s", content)
 
 		// === STRONG ASSERTIONS ===
@@ -380,7 +382,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenRenameSymbolStrong)
 		t.Logf("Type rename result:\n%s", content)
 
 		// Note: The structured Changes field is populated internally but MCP returns only text content.

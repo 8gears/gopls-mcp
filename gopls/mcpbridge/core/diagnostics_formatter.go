@@ -53,10 +53,10 @@ func formatDiagnosticsFull(ctx context.Context, snapshot *cache.Snapshot, ids []
 				column = int(diag.Range.Start.Character) + 1 // Convert to 1-indexed
 			}
 
-			// Extract code from diagnostic if available
-			code := ""
+			// Extract diagnostic code if available
+			diagnosticCode := ""
 			if diag.Code != "" {
-				code = string(diag.Code)
+				diagnosticCode = string(diag.Code)
 			}
 
 			// Build source string (e.g., "go", "compiler")
@@ -65,14 +65,28 @@ func formatDiagnosticsFull(ctx context.Context, snapshot *cache.Snapshot, ids []
 				source = string(diag.Source)
 			}
 
+			// Extract code snippet at diagnostic location
+			codeSnippet := ""
+			if fh, err := snapshot.ReadFile(ctx, diag.URI); err == nil {
+				if content, err := fh.Content(); err == nil && content != nil {
+					// Get the file content and extract the specific line
+					lines := strings.Split(string(content), "\n")
+					lineIdx := int(diag.Range.Start.Line)
+					if lineIdx >= 0 && lineIdx < len(lines) {
+						codeSnippet = strings.TrimSpace(lines[lineIdx])
+					}
+				}
+			}
+
 			report := api.DiagnosticReport{
-				File:     filePath,
-				Line:     line,
-				Column:   column,
-				Severity: severity,
-				Message:  diag.Message,
-				Source:   source,
-				Code:     code,
+				File:           filePath,
+				Line:           line,
+				Column:         column,
+				Severity:       severity,
+				Message:        diag.Message,
+				Source:         source,
+				DiagnosticCode: diagnosticCode,
+				CodeSnippet:    codeSnippet,
 			}
 
 			allReports = append(allReports, report)
@@ -96,8 +110,11 @@ func formatDiagnosticsFull(ctx context.Context, snapshot *cache.Snapshot, ids []
 			for _, r := range reports {
 				loc := fmt.Sprintf("%d:%d", r.Line, r.Column)
 				fmt.Fprintf(&summary, "  %s [%s]: %s\n", loc, r.Severity, r.Message)
-				if r.Code != "" {
-					fmt.Fprintf(&summary, "        Code: %s\n", r.Code)
+				if r.CodeSnippet != "" {
+					fmt.Fprintf(&summary, "    Code: %s\n", r.CodeSnippet)
+				}
+				if r.DiagnosticCode != "" {
+					fmt.Fprintf(&summary, "    Diagnostic: %s\n", r.DiagnosticCode)
 				}
 			}
 			fmt.Fprintln(&summary)

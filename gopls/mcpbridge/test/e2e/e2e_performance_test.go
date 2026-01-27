@@ -26,8 +26,7 @@ type performanceTestCase struct {
 
 // TestPerformance_LargeFiles tests tool performance on large files
 func TestPerformance_LargeFiles(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-	largeFile := filepath.Join(goplsMcpDir, "core", "handlers.go")
+	largeFile := filepath.Join(globalGoplsMcpDir, "core", "handlers.go")
 
 	testCases := []performanceTestCase{
 		{
@@ -47,24 +46,6 @@ func TestPerformance_LargeFiles(t *testing.T) {
 				}
 			},
 			description: "Read a large production file efficiently",
-		},
-		{
-			name:    "FileContextLargeFile",
-			tool:    "go_file_context",
-			args:    map[string]any{"file": largeFile},
-			timeout: 1 * time.Second,
-			assertion: func(t *testing.T, content string, duration time.Duration) {
-				t.Logf("File context for large file in %v", duration)
-
-				if duration > 1*time.Second {
-					t.Logf("Note: File context took %v (expected < 1s for cached metadata)", duration)
-				}
-
-				if !strings.Contains(content, "package") {
-					t.Error("Expected package information")
-				}
-			},
-			description: "Get file context (should be faster than reading full file)",
 		},
 	}
 
@@ -89,7 +70,7 @@ func runPerformanceTests(t *testing.T, testCases []performanceTestCase) {
 				t.Fatalf("Failed to call %s: %v", tc.tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenPerformanceLargeFiles)
 			tc.assertion(t, content, duration)
 		})
 	}
@@ -97,17 +78,15 @@ func runPerformanceTests(t *testing.T, testCases []performanceTestCase) {
 
 // TestPerformance_DeepAnalysis tests performance of deep code analysis
 func TestPerformance_DeepAnalysis(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	testCases := []performanceTestCase{
 		{
 			name:    "ListPackageSymbolsWithBodies",
-			tool:    "list_package_symbols",
+			tool:    "go_list_package_symbols",
 			args:    map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   true,
 				"include_bodies": true,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 			timeout: 10 * time.Second,
 			assertion: func(t *testing.T, content string, duration time.Duration) {
@@ -125,12 +104,12 @@ func TestPerformance_DeepAnalysis(t *testing.T) {
 		},
 		{
 			name:    "DeepDependencyGraph",
-			tool:    "get_dependency_graph",
+			tool:    "go_get_dependency_graph",
 			args:    map[string]any{
 				"package_path":       "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_transitive": true,
 				"max_depth":          3,
-				"Cwd":                goplsMcpDir,
+				"Cwd":                globalGoplsMcpDir,
 			},
 			timeout: 15 * time.Second,
 			assertion: func(t *testing.T, content string, duration time.Duration) {
@@ -153,8 +132,6 @@ func TestPerformance_DeepAnalysis(t *testing.T) {
 
 // TestPerformance_BatchOperations tests performance of batch operations
 func TestPerformance_BatchOperations(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	testCases := []performanceTestCase{
 		{
 			name:    "MultipleSymbolLookups",
@@ -173,7 +150,7 @@ func TestPerformance_BatchOperations(t *testing.T) {
 		{
 			name:    "MultipleFileDiagnostics",
 			tool:    "go_diagnostics",
-			args:    map[string]any{"Cwd": goplsMcpDir},
+			args:    map[string]any{"Cwd": globalGoplsMcpDir},
 			timeout: 3 * time.Second,
 			assertion: func(t *testing.T, content string, duration time.Duration) {
 				t.Logf("Diagnostics on codebase in %v", duration)
@@ -207,7 +184,7 @@ func TestPerformance_BatchOperations(t *testing.T) {
 				t.Logf("Error searching for %s: %v", symbol, err)
 				continue
 			}
-			_ = testutil.ResultText(res)
+			_ = testutil.ResultText(t, res, testutil.GoldenPerformanceBatchOperations)
 		}
 		duration := time.Since(start)
 
@@ -227,17 +204,15 @@ func TestPerformance_BatchOperations(t *testing.T) {
 
 // TestPerformance_PackageAPI tests performance of package API extraction
 func TestPerformance_PackageAPI(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	testCases := []performanceTestCase{
 		{
 			name:    "SinglePackageAPI",
-			tool:    "list_package_symbols",
+			tool:    "go_list_package_symbols",
 			args:    map[string]any{
 				"package_path":   "golang.org/x/tools/gopls/mcpbridge/core",
 				"include_docs":   true,
 				"include_bodies": false,
-				"Cwd":            goplsMcpDir,
+				"Cwd":            globalGoplsMcpDir,
 			},
 			timeout: 3 * time.Second,
 			assertion: func(t *testing.T, content string, duration time.Duration) {
@@ -286,12 +261,12 @@ func TestPerformance_PackageAPI(t *testing.T) {
 		start := time.Now()
 		for _, pkg := range packages {
 			_, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-				Name: "list_package_symbols",
+				Name: "go_list_package_symbols",
 				Arguments: map[string]any{
 					"package_path":   pkg,
 					"include_docs":   false,
 					"include_bodies": false,
-					"Cwd":            goplsMcpDir,
+					"Cwd":            globalGoplsMcpDir,
 				},
 			})
 			if err != nil {
@@ -317,15 +292,13 @@ func TestPerformance_PackageAPI(t *testing.T) {
 
 // TestPerformance_AnalyzeWorkspace tests workspace analysis performance
 func TestPerformance_AnalyzeWorkspace(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FullWorkspaceAnalysis", func(t *testing.T) {
 		// Test: Analyze entire gopls-mcp workspace
 		start := time.Now()
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "analyze_workspace",
+			Name: "go_analyze_workspace",
 			Arguments: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 		})
 		duration := time.Since(start)
@@ -334,7 +307,7 @@ func TestPerformance_AnalyzeWorkspace(t *testing.T) {
 			t.Fatalf("Failed to analyze workspace: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenPerformanceAnalyzeWorkspace)
 		t.Logf("Workspace analysis in %v", duration)
 
 		// Should be fast (< 5 seconds)
@@ -352,7 +325,7 @@ func TestPerformance_AnalyzeWorkspace(t *testing.T) {
 		// Test: List all packages in the module
 		start := time.Now()
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_module_packages",
+			Name: "go_list_module_packages",
 			Arguments: map[string]any{
 				"module_path":      "golang.org/x/tools/gopls/mcpbridge",
 				"include_docs":     false,
@@ -367,7 +340,7 @@ func TestPerformance_AnalyzeWorkspace(t *testing.T) {
 			t.Fatalf("Failed to list packages: %v", err)
 		}
 
-		_ = testutil.ResultText(res)
+		_ = testutil.ResultText(t, res, testutil.GoldenPerformanceAnalyzeWorkspace)
 		t.Logf("Listed all packages in %v", duration)
 
 		// Should be fast (< 3 seconds)
@@ -381,15 +354,13 @@ func TestPerformance_AnalyzeWorkspace(t *testing.T) {
 
 // TestPerformance_CallHierarchy tests call hierarchy performance
 func TestPerformance_CallHierarchy(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("IncomingCallHierarchy", func(t *testing.T) {
 		// Test: Get incoming calls for a function
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 
 		start := time.Now()
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -406,7 +377,7 @@ func TestPerformance_CallHierarchy(t *testing.T) {
 			t.Fatalf("Failed to get call hierarchy: %v", err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenPerformanceCallHierarchy)
 		t.Logf("Incoming call hierarchy in %v", duration)
 
 		// Should be reasonably fast (< 5 seconds)
@@ -423,11 +394,11 @@ func TestPerformance_CallHierarchy(t *testing.T) {
 
 	t.Run("OutgoingCallHierarchy", func(t *testing.T) {
 		// Test: Get outgoing calls for a function
-		wrappersPath := filepath.Join(goplsMcpDir, "core", "gopls_wrappers.go")
+		wrappersPath := filepath.Join(globalGoplsMcpDir, "core", "gopls_wrappers.go")
 
 		start := time.Now()
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "get_call_hierarchy",
+			Name: "go_get_call_hierarchy",
 			Arguments: map[string]any{
 				"locator": map[string]any{
 					"symbol_name":  "handleGoDefinition",
@@ -444,7 +415,7 @@ func TestPerformance_CallHierarchy(t *testing.T) {
 			t.Fatalf("Failed to get call hierarchy: %v", err)
 		}
 
-		_ = testutil.ResultText(res)
+		_ = testutil.ResultText(t, res, testutil.GoldenPerformanceCallHierarchy)
 		t.Logf("Outgoing call hierarchy in %v", duration)
 
 		// Should be reasonably fast (< 5 seconds)
@@ -458,15 +429,13 @@ func TestPerformance_CallHierarchy(t *testing.T) {
 
 // TestPerformance_DiagnosticsIncremental tests incremental diagnostics performance
 func TestPerformance_DiagnosticsIncremental(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("FirstDiagnosticsRun", func(t *testing.T) {
 		// Test: First diagnostics run (may be slower due to cache warmup)
 		start := time.Now()
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_diagnostics",
 			Arguments: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 		})
 		duration := time.Since(start)
@@ -475,7 +444,7 @@ func TestPerformance_DiagnosticsIncremental(t *testing.T) {
 			t.Fatalf("Failed to run diagnostics: %v", err)
 		}
 
-		_ = testutil.ResultText(res)
+		_ = testutil.ResultText(t, res, testutil.GoldenPerformanceDiagnosticsIncremental)
 		t.Logf("First diagnostics run in %v", duration)
 
 		// First run might be slower but should still complete
@@ -493,7 +462,7 @@ func TestPerformance_DiagnosticsIncremental(t *testing.T) {
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
 			Name: "go_diagnostics",
 			Arguments: map[string]any{
-				"Cwd": goplsMcpDir,
+				"Cwd": globalGoplsMcpDir,
 			},
 		})
 		duration := time.Since(start)
@@ -502,7 +471,7 @@ func TestPerformance_DiagnosticsIncremental(t *testing.T) {
 			t.Fatalf("Failed to run diagnostics: %v", err)
 		}
 
-		_ = testutil.ResultText(res)
+		_ = testutil.ResultText(t, res, testutil.GoldenPerformanceDiagnosticsIncremental)
 		t.Logf("Second diagnostics run in %v", duration)
 
 		// Second run should be faster with warm cache
@@ -516,16 +485,14 @@ func TestPerformance_DiagnosticsIncremental(t *testing.T) {
 
 // TestPerformance_LargeTestFile tests performance on test files
 func TestPerformance_LargeTestFile(t *testing.T) {
-	goplsMcpDir, _ := filepath.Abs("../..")
-
 	t.Run("ComprehensiveTestFile", func(t *testing.T) {
 		// Test: Work with a large E2E test file
-		largeTestFile := filepath.Join(goplsMcpDir, "test", "e2e", "e2e_comprehensive_workflows_test.go")
+		largeTestFile := filepath.Join(globalGoplsMcpDir, "test", "e2e", "e2e_comprehensive_workflows_test.go")
 
-		// Get file context
+		// Read the file
 		start := time.Now()
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "go_file_context",
+			Name: "go_read_file",
 			Arguments: map[string]any{
 				"file": largeTestFile,
 			},
@@ -533,15 +500,15 @@ func TestPerformance_LargeTestFile(t *testing.T) {
 		duration := time.Since(start)
 
 		if err != nil {
-			t.Fatalf("Failed to get file context: %v", err)
+			t.Fatalf("Failed to read file: %v", err)
 		}
 
-		_ = testutil.ResultText(res)
-		t.Logf("Large test file context in %v", duration)
+		_ = testutil.ResultText(t, res, testutil.GoldenPerformanceLargeTestFile)
+		t.Logf("Large test file read in %v", duration)
 
-		// Should be fast
-		if duration > 2*time.Second {
-			t.Logf("Note: File context took %v (expected < 2s)", duration)
+		// Should be reasonably fast
+		if duration > 5*time.Second {
+			t.Logf("Note: File read took %v (expected < 5s)", duration)
 		}
 
 		t.Log("Large test file handling completed")
@@ -563,7 +530,7 @@ func TestPerformance_LargeTestFile(t *testing.T) {
 			t.Fatalf("Failed to search: %v", err)
 		}
 
-		_ = testutil.ResultText(res)
+		_ = testutil.ResultText(t, res, testutil.GoldenPerformanceLargeTestFile)
 		t.Logf("Search across test files in %v", duration)
 
 		// Should be fast

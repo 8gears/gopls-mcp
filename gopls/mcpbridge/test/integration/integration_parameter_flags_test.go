@@ -70,7 +70,7 @@ func NestedFunc() string {
 
 		t.Run("Default_NoFilters", func(t *testing.T) {
 			// Without any filters, should return all packages
-			tool := "list_module_packages"
+			tool := "go_list_module_packages"
 			args := map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false,
@@ -84,7 +84,7 @@ func NestedFunc() string {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("All packages (no filters):\n%s", content)
 
 			// Should include test packages
@@ -105,7 +105,7 @@ func NestedFunc() string {
 
 		t.Run("ExcludeTests_True", func(t *testing.T) {
 			// Test exclude_tests=true filters out test packages
-			tool := "list_module_packages"
+			tool := "go_list_module_packages"
 			args := map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false,
@@ -119,7 +119,7 @@ func NestedFunc() string {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Packages (exclude_tests=true):\n%s", content)
 
 			// Should NOT include test packages
@@ -135,7 +135,7 @@ func NestedFunc() string {
 
 		t.Run("ExcludeInternal_True", func(t *testing.T) {
 			// Test exclude_internal=true filters out internal packages
-			tool := "list_module_packages"
+			tool := "go_list_module_packages"
 			args := map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false,
@@ -149,7 +149,7 @@ func NestedFunc() string {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Packages (exclude_internal=true):\n%s", content)
 
 			// Should NOT include internal packages
@@ -165,7 +165,7 @@ func NestedFunc() string {
 
 		t.Run("TopLevelOnly_True", func(t *testing.T) {
 			// Test top_level_only=true filters out nested packages
-			tool := "list_module_packages"
+			tool := "go_list_module_packages"
 			args := map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false,
@@ -179,7 +179,7 @@ func NestedFunc() string {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Packages (top_level_only=true):\n%s", content)
 
 			// Should NOT include nested packages (subpkg)
@@ -195,7 +195,7 @@ func NestedFunc() string {
 
 		t.Run("AllFilters_True", func(t *testing.T) {
 			// Test with all filters enabled
-			tool := "list_module_packages"
+			tool := "go_list_module_packages"
 			args := map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     false,
@@ -209,7 +209,7 @@ func NestedFunc() string {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Packages (all filters true):\n%s", content)
 
 			// Should NOT include test packages
@@ -235,7 +235,7 @@ func NestedFunc() string {
 
 		t.Run("IncludeDocs_BooleanFlag", func(t *testing.T) {
 			// Test include_docs boolean flag
-			tool := "list_module_packages"
+			tool := "go_list_module_packages"
 			args := map[string]any{
 				"Cwd":              projectDir,
 				"include_docs":     true,
@@ -249,7 +249,7 @@ func NestedFunc() string {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Packages with include_docs=true:\n%s", content)
 
 			// Should include package documentation
@@ -294,7 +294,7 @@ func main() {
 
 		t.Run("IncludeDocs_False", func(t *testing.T) {
 			// Test include_docs=false (default) - should not include documentation
-			tool := "list_package_symbols"
+			tool := "go_list_package_symbols"
 			args := map[string]any{
 				"package_path":   "example.com/test",
 				"include_docs":   false,
@@ -307,7 +307,7 @@ func main() {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Symbols without docs:\n%s", content)
 
 			// Should find symbols
@@ -325,7 +325,7 @@ func main() {
 			// Test include_docs=true - should include detail information
 			// Note: Current implementation includes the Detail field (signature) from DocumentSymbol
 			// Actual documentation comments require a different approach (e.g., parsing source directly)
-			tool := "list_package_symbols"
+			tool := "go_list_package_symbols"
 			args := map[string]any{
 				"package_path":   "example.com/test",
 				"include_docs":   true,
@@ -338,7 +338,7 @@ func main() {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Symbols with docs:\n%s", content)
 
 			// Should find symbols
@@ -356,7 +356,7 @@ func main() {
 
 		t.Run("IncludeBodies_False", func(t *testing.T) {
 			// Test include_bodies=false (default) - should not include function bodies
-			tool := "list_package_symbols"
+			tool := "go_list_package_symbols"
 			args := map[string]any{
 				"package_path":   "example.com/test",
 				"include_docs":   false,
@@ -369,7 +369,7 @@ func main() {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Symbols without bodies:\n%s", content)
 
 			// Should find symbols
@@ -387,7 +387,7 @@ func main() {
 			// Test include_bodies=true
 			// Note: Current implementation uses golang.DocumentSymbols() which doesn't include function bodies
 			// Full function body extraction requires reading source files directly
-			tool := "list_package_symbols"
+			tool := "go_list_package_symbols"
 			args := map[string]any{
 				"package_path":   "example.com/test",
 				"include_docs":   false,
@@ -400,7 +400,7 @@ func main() {
 				t.Fatalf("Failed to call tool %s: %v", tool, err)
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenSomething)
 			t.Logf("Symbols with bodies:\n%s", content)
 
 			// Should find symbols

@@ -27,7 +27,7 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 
 	t.Run("ExploreHTTPServerAPI", func(t *testing.T) {
 		// Use list_package_symbols to see the full net/http API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "net/http",
 			"include_docs":   false,
@@ -40,7 +40,7 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibNetHTTP)
 		t.Logf("net/http API (first 5000 chars):\n%s", testutil.TruncateString(content, 5000))
 		t.Logf("Full content length: %d chars", len(content))
 
@@ -82,11 +82,12 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 		}
 
 		// Instead, let's use list_package_symbols with include_bodies to find Handler implementations
-		tool = "list_package_symbols"
+		tool = "go_list_package_symbols"
 		args = map[string]any{
 			"package_path":   "net/http",
 			"include_docs":   true,
 			"include_bodies": true,
+			"Cwd":            projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -94,7 +95,7 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibNetHTTP)
 		t.Logf("HTTP Handler implementations:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should show HandlerFunc as a common implementation
@@ -115,7 +116,7 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibNetHTTP)
 		t.Logf("Middleware search:\n%s", content)
 
 		// Search for "StripPrefix" or common middleware utilities
@@ -129,7 +130,7 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content = testutil.ResultText(res)
+		content = testutil.ResultText(t, res, testutil.GoldenStdlibNetHTTP)
 		t.Logf("StripPrefix search:\n%s", content)
 
 		if strings.Contains(content, "StripPrefix") || strings.Contains(content, "found") {
@@ -139,11 +140,12 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 
 	t.Run("ExploreFileSystem", func(t *testing.T) {
 		// List all symbols in net/http to find file-related utilities
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "net/http",
 			"include_docs":   true,
 			"include_bodies": false,
+			"Cwd":            projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -151,7 +153,7 @@ func TestStdlibNetHttpDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibNetHTTP)
 		t.Logf("net/http symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find FileServer
@@ -171,11 +173,12 @@ func TestStdlibContextDeepDive(t *testing.T) {
 
 	t.Run("ExploreContextAPI", func(t *testing.T) {
 		// Get the full context package API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "context",
 			"include_docs":   true,
 			"include_bodies": true,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -183,7 +186,7 @@ func TestStdlibContextDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibContext)
 		t.Logf("Context package API:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find key context functions
@@ -207,11 +210,12 @@ func TestStdlibContextDeepDive(t *testing.T) {
 
 	t.Run("UnderstandContextInterface", func(t *testing.T) {
 		// Use list_package_symbols to see the Context interface definition
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "context",
 			"include_docs":   true,
 			"include_bodies": true,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -219,7 +223,7 @@ func TestStdlibContextDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibContext)
 		t.Logf("Context interface:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find Context interface methods
@@ -251,7 +255,7 @@ func TestStdlibContextDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibContext)
 		t.Logf("CancelFunc search:\n%s", content)
 
 		// Should find CancelFunc
@@ -262,11 +266,12 @@ func TestStdlibContextDeepDive(t *testing.T) {
 
 	t.Run("UnderstandDeadlineBehavior", func(t *testing.T) {
 		// List context package symbols to find deadline-related types
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "context",
 			"include_docs":   true,
 			"include_bodies": true,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -274,7 +279,7 @@ func TestStdlibContextDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibContext)
 		t.Logf("Context deadline symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find Timer type
@@ -289,11 +294,12 @@ func TestStdlibSyncDeepDive(t *testing.T) {
 
 	t.Run("ExploreSynchronizationPrimitives", func(t *testing.T) {
 		// Get sync package API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "sync",
 			"include_docs":   false,
 			"include_bodies": false,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -301,7 +307,7 @@ func TestStdlibSyncDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibSync)
 		t.Logf("Sync package API:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find key synchronization types
@@ -326,11 +332,12 @@ func TestStdlibSyncDeepDive(t *testing.T) {
 
 	t.Run("UnderstandMutexPatterns", func(t *testing.T) {
 		// List symbols with docs to understand Mutex methods
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "sync",
 			"include_docs":   true,
 			"include_bodies": true,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -338,7 +345,7 @@ func TestStdlibSyncDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibSync)
 		t.Logf("Mutex symbols with docs:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find Lock and Unlock methods
@@ -359,7 +366,7 @@ func TestStdlibSyncDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibSync)
 		t.Logf("Pool search:\n%s", content)
 
 		// Should find sync.Pool
@@ -380,7 +387,7 @@ func TestStdlibSyncDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibSync)
 		t.Logf("ErrorGroup search:\n%s", content)
 
 		// Note: ErrorGroup is in x/sync/errgroup, not sync package
@@ -394,11 +401,12 @@ func TestStdlibIODeepDive(t *testing.T) {
 
 	t.Run("ExploreIOInterfaces", func(t *testing.T) {
 		// Get io package API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "io",
 			"include_docs":   true,
 			"include_bodies": true,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -406,7 +414,7 @@ func TestStdlibIODeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibIO)
 		t.Logf("io package API:\n%s", testutil.TruncateString(content, 3000))
 
 		// Should find core io interfaces
@@ -444,7 +452,7 @@ func TestStdlibIODeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibIO)
 		t.Logf("Pipe search:\n%s", content)
 
 		if strings.Contains(content, "Pipe") {
@@ -454,11 +462,12 @@ func TestStdlibIODeepDive(t *testing.T) {
 
 	t.Run("ExploreBufioUtilities", func(t *testing.T) {
 		// Get bufio package API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "bufio",
 			"include_docs":   false,
 			"include_bodies": false,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -466,7 +475,7 @@ func TestStdlibIODeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibIO)
 		t.Logf("bufio package API:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find bufio utilities
@@ -498,7 +507,7 @@ func TestStdlibIODeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibIO)
 		t.Logf("LimitReader search:\n%s", content)
 
 		if strings.Contains(content, "LimitReader") {
@@ -513,7 +522,7 @@ func TestStdlibEncodingJSONDeepDive(t *testing.T) {
 
 	t.Run("ExploreJSONAPI", func(t *testing.T) {
 		// Get encoding/json API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "encoding/json",
 			"include_docs":   false,
@@ -526,7 +535,7 @@ func TestStdlibEncodingJSONDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibEncodingJSON)
 		t.Logf("encoding/json API:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find key JSON functions
@@ -561,7 +570,7 @@ func TestStdlibEncodingJSONDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibEncodingJSON)
 		t.Logf("RawMessage search:\n%s", content)
 
 		if strings.Contains(content, "RawMessage") {
@@ -571,7 +580,7 @@ func TestStdlibEncodingJSONDeepDive(t *testing.T) {
 
 	t.Run("ExploreStreamingJSON", func(t *testing.T) {
 		// List encoding/json symbols to find streaming types
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "encoding/json",
 			"include_docs":   true,
@@ -584,7 +593,7 @@ func TestStdlibEncodingJSONDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibEncodingJSON)
 		t.Logf("encoding/json symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find Encoder and Decoder
@@ -610,7 +619,7 @@ func TestStdlibDatabaseSQLDeepDive(t *testing.T) {
 
 	t.Run("ExploreDatabaseAPI", func(t *testing.T) {
 		// Get database/sql API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "database/sql",
 			"include_docs":   false,
@@ -623,7 +632,7 @@ func TestStdlibDatabaseSQLDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibDatabaseSQL)
 		t.Logf("database/sql API:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find key database types
@@ -658,7 +667,7 @@ func TestStdlibDatabaseSQLDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibDatabaseSQL)
 		t.Logf("Open search:\n%s", content)
 
 		if strings.Contains(content, "Open") {
@@ -668,7 +677,7 @@ func TestStdlibDatabaseSQLDeepDive(t *testing.T) {
 
 	t.Run("ExploreTransactionPattern", func(t *testing.T) {
 		// List database/sql symbols to find transaction methods
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "database/sql",
 			"include_docs":   true,
@@ -681,7 +690,7 @@ func TestStdlibDatabaseSQLDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibDatabaseSQL)
 		t.Logf("database/sql transaction symbols:\n%s", testutil.TruncateString(content, 3000))
 
 		// Should find transaction methods
@@ -713,7 +722,7 @@ func TestStdlibDatabaseSQLDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibDatabaseSQL)
 		t.Logf("Null search:\n%s", content)
 
 		if strings.Contains(content, "Null") {
@@ -727,11 +736,12 @@ func TestStdlibTimeDeepDive(t *testing.T) {
 
 	t.Run("ExploreTimeAPI", func(t *testing.T) {
 		// Get time package API
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "time",
 			"include_docs":   false,
 			"include_bodies": false,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -739,7 +749,7 @@ func TestStdlibTimeDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibTime)
 		t.Logf("time package API:\n%s", testutil.TruncateString(content, 3000))
 
 		// Should find key time types
@@ -773,7 +783,7 @@ func TestStdlibTimeDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibTime)
 		t.Logf("Ticker search:\n%s", content)
 
 		if strings.Contains(content, "Ticker") {
@@ -783,11 +793,12 @@ func TestStdlibTimeDeepDive(t *testing.T) {
 
 	t.Run("ExploreDurationOperations", func(t *testing.T) {
 		// List time package symbols to find duration operations
-		tool := "list_package_symbols"
+		tool := "go_list_package_symbols"
 		args := map[string]any{
 			"package_path":   "time",
 			"include_docs":   true,
 			"include_bodies": false,
+			"Cwd":            globalGoplsMcpDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -795,7 +806,7 @@ func TestStdlibTimeDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibTime)
 		t.Logf("Duration operations:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find duration methods
@@ -827,7 +838,7 @@ func TestStdlibTimeDeepDive(t *testing.T) {
 			t.Fatalf("Failed to call tool %s: %v", tool, err)
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenStdlibTime)
 		t.Logf("LoadLocation search:\n%s", content)
 
 		if strings.Contains(content, "LoadLocation") {

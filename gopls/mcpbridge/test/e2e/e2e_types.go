@@ -25,17 +25,3 @@ type setupTestCase struct {
 	skipReason string
 	setup      func(t *testing.T) map[string]any
 }
-
-// fileTestCase defines a test case with fields for test file creation.
-// Used in generics tests that need to create test files with specific source code.
-type fileTestCase struct {
-	name       string
-	tool       string
-	args       map[string]any
-	assertion  func(t *testing.T, content string)
-	skip       bool
-	skipReason string
-	tmpDir     string
-	moduleName string
-	sourceCode string
-}

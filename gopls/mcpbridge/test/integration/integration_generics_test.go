@@ -100,7 +100,7 @@ func main() {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsSupport)
 			t.Logf("Definition result for Map[T]:\n%s", content)
 
 			// Should find the generic function definition
@@ -197,7 +197,7 @@ func main() {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsSupport)
 			t.Logf("Definition result for Stack[T]:\n%s", content)
 
 			// Should find the generic type definition
@@ -303,7 +303,7 @@ func main() {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsSupport)
 			t.Logf("Definition result for Ordered constraint:\n%s", content)
 
 			// Should find the Ordered interface definition
@@ -395,7 +395,7 @@ func main() {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGenericsSupport)
 			t.Logf("Implementation result for Container[T]:\n%s", content)
 
 			// Should find SliceContainer as an implementation
@@ -470,7 +470,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenInterfaceSatisfaction)
 		t.Logf("Diagnostics for missing method:\n%s", content)
 
 		// Should report an error about FileWriter not implementing Writer
@@ -536,7 +536,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenInterfaceSatisfaction)
 		t.Logf("Diagnostics for wrong signature:\n%s", content)
 
 		// Should report type mismatch
@@ -605,7 +605,7 @@ func main() {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenInterfaceSatisfaction)
 			t.Logf("Diagnostics for correct implementation:\n%s", content)
 
 			// Should not report interface errors
@@ -638,7 +638,7 @@ func main() {
 				t.Fatal("Expected non-nil result")
 			}
 
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenInterfaceSatisfaction)
 			t.Logf("Implementation result:\n%s", content)
 
 			// Should find Person as an implementation
@@ -709,7 +709,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenInterfaceSatisfaction)
 		t.Logf("Diagnostics for generic interface:\n%s", content)
 
 		// Should not report errors for correct generic interface implementation
@@ -794,7 +794,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenInterfaceSatisfaction)
 		t.Logf("Diagnostics for embedded interfaces:\n%s", content)
 
 		// Should not report errors for correct embedded interface implementation

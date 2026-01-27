@@ -101,7 +101,7 @@ func handleAnalyzeWorkspace(ctx context.Context, h *Handler, req *mcp.CallToolRe
 	// Estimate response size and truncate if needed
 	maxBytes := h.config.MaxResponseBytes
 	if maxBytes == 0 {
-		maxBytes = 400000 // Default (400KB)
+		maxBytes = defaultMaxResponseBytes // Default (32KB)
 	}
 
 	// Build summary first to see size

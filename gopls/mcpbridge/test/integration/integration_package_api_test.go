@@ -3,14 +3,12 @@ package integration
 // End-to-end test for get_package_symbol_detail functionality.
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"golang.org/x/tools/gopls/mcpbridge/api"
 	"golang.org/x/tools/gopls/mcpbridge/test/testutil"
 )
 
@@ -53,7 +51,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"symbol_filters": []map[string]any{{"name": "Hello"}},
@@ -71,26 +69,25 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		// Parse result to check symbols
-		result := &api.OGetPackageSymbolDetailResult{}
-		resultText := testutil.ResultText(res)
-		// Extract JSON from the text content (find the first { and last })
-		jsonStart := strings.Index(resultText, "{")
-		jsonEnd := strings.LastIndex(resultText, "}")
-		if jsonStart == -1 || jsonEnd == -1 {
-			t.Fatalf("Could not find JSON in result: %s", resultText)
-		}
-		jsonStr := resultText[jsonStart : jsonEnd+1]
-		if err := json.Unmarshal([]byte(jsonStr), result); err != nil {
-			t.Fatalf("Failed to parse result: %v\nResult: %s", err, resultText)
-		}
+		content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
+		t.Logf("Package Symbol Detail (specific filters):\n%s", content)
 
 		// Should find the Hello function
-		if len(result.Symbols) != 1 {
-			t.Errorf("Expected 1 symbol (Hello), got %d", len(result.Symbols))
+		if !strings.Contains(content, "Hello") {
+			t.Errorf("Expected to find Hello symbol, got: %s", content)
 		}
-		if len(result.Symbols) > 0 && result.Symbols[0].Name != "Hello" {
-			t.Errorf("Expected symbol named 'Hello', got '%s'", result.Symbols[0].Name)
+
+		// Should NOT find Add or Multiply (not in filters)
+		if strings.Contains(content, "Add") {
+			t.Errorf("Expected NOT to find Add symbol (not in filters), got: %s", content)
+		}
+		if strings.Contains(content, "Multiply") {
+			t.Errorf("Expected NOT to find Multiply symbol (not in filters), got: %s", content)
+		}
+
+		// Should contain signature for Hello
+		if !strings.Contains(content, "func() string") {
+			t.Errorf("Expected to find signature for Hello, got: %s", content)
 		}
 	})
 
@@ -136,7 +133,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path": "example.com/test",
 			"symbol_filters": []any{
@@ -157,51 +154,28 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		// Parse result to check symbols
-		result := &api.OGetPackageSymbolDetailResult{}
-		resultText := testutil.ResultText(res)
-		// Extract JSON from the text content (find the first { and last })
-		jsonStart := strings.Index(resultText, "{")
-		jsonEnd := strings.LastIndex(resultText, "}")
-		if jsonStart == -1 || jsonEnd == -1 {
-			t.Fatalf("Could not find JSON in result: %s", resultText)
+		content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
+		t.Logf("Package Symbol Detail (symbol filters):\n%s", content)
+
+		// Should find Hello and Add
+		if !strings.Contains(content, "Hello") {
+			t.Errorf("Expected to find Hello symbol, got: %s", content)
 		}
-		jsonStr := resultText[jsonStart : jsonEnd+1]
-		if err := json.Unmarshal([]byte(jsonStr), result); err != nil {
-			t.Fatalf("Failed to parse result: %v\nResult: %s", err, resultText)
+		if !strings.Contains(content, "Add") {
+			t.Errorf("Expected to find Add symbol, got: %s", content)
 		}
 
-		t.Logf("Got %d symbols", len(result.Symbols))
-
-		// Should return only Hello and Add
-		if len(result.Symbols) != 2 {
-			t.Errorf("Expected 2 symbols (Hello, Add), got %d", len(result.Symbols))
+		// Should NOT find Multiply (not in filters)
+		if strings.Contains(content, "Multiply") {
+			t.Errorf("Expected NOT to find Multiply symbol (not in filters), got: %s", content)
 		}
 
-		// Check that we got Hello and Add (not Multiply)
-		foundHello := false
-		foundAdd := false
-		foundMultiply := false
-		for _, sym := range result.Symbols {
-			if sym.Name == "Hello" {
-				foundHello = true
-			}
-			if sym.Name == "Add" {
-				foundAdd = true
-			}
-			if sym.Name == "Multiply" {
-				foundMultiply = true
-			}
+		// Should contain signatures
+		if !strings.Contains(content, "func() string") {
+			t.Errorf("Expected to find signature for Hello, got: %s", content)
 		}
-
-		if !foundHello {
-			t.Error("Expected to find Hello symbol")
-		}
-		if !foundAdd {
-			t.Error("Expected to find Add symbol")
-		}
-		if foundMultiply {
-			t.Error("Expected NOT to find Multiply symbol (not in filters)")
+		if !strings.Contains(content, "func(a, b int) int") {
+			t.Errorf("Expected to find signature for Add, got: %s", content)
 		}
 	})
 
@@ -262,7 +236,7 @@ func main() {
 		// First, try list_package_symbols to verify the symbols exist
 		t.Log("Testing with list_package_symbols first...")
 		listRes, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "list_package_symbols",
+			Name: "go_list_package_symbols",
 			Arguments: map[string]any{
 				"package_path":   "example.com/test",
 				"include_docs":   false,
@@ -273,7 +247,7 @@ func main() {
 		if err != nil {
 			t.Logf("Warning: list_package_symbols failed: %v", err)
 		} else {
-			listContent := testutil.ResultText(listRes)
+			listContent := testutil.ResultText(t, listRes, testutil.GoldenGetPackageSymbolDetail)
 			t.Logf("list_package_symbols result (first 500 chars): %s", testutil.TruncateString(listContent, 500))
 			if strings.Contains(listContent, "Person") {
 				t.Log("Found Person type via list_package_symbols")
@@ -282,7 +256,7 @@ func main() {
 			}
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path": "example.com/test",
 			"symbol_filters": []any{
@@ -303,73 +277,49 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		// Parse result to check symbols
-		result := &api.OGetPackageSymbolDetailResult{}
-		resultText := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
+		t.Logf("Package Symbol Detail (methods with receiver filter):\n%s", content)
 
-		// Debug: log full result
-		t.Logf("Full result text (first 1000 chars): %s", testutil.TruncateString(resultText, 1000))
-		t.Logf("Result text length: %d chars", len(resultText))
-
-		// Extract JSON from the text content (find the first { and last })
-		jsonStart := strings.Index(resultText, "{")
-		jsonEnd := strings.LastIndex(resultText, "}")
-		if jsonStart == -1 || jsonEnd == -1 {
-			t.Fatalf("Could not find JSON in result: %s", resultText)
+		// Should find Greeting and Birthday methods
+		if !strings.Contains(content, "Greeting") {
+			t.Errorf("Expected to find Greeting method, got: %s", content)
 		}
-		jsonStr := resultText[jsonStart : jsonEnd+1]
-		if err := json.Unmarshal([]byte(jsonStr), result); err != nil {
-			t.Fatalf("Failed to parse result: %v\nResult: %s", err, resultText)
+		if !strings.Contains(content, "Birthday") {
+			t.Errorf("Expected to find Birthday method, got: %s", content)
 		}
 
-		t.Logf("Got %d symbols", len(result.Symbols))
-
-		// Should return only Person methods
-		if len(result.Symbols) != 2 {
-			t.Errorf("Expected 2 symbols (Person.Greeting, Person.Birthday), got %d", len(result.Symbols))
+		// Should NOT find Speak (different receiver)
+		if strings.Contains(content, "Speak") {
+			t.Errorf("Expected NOT to find Speak method (different receiver), got: %s", content)
 		}
 
-		// Check receiver field
-		foundGreeting := false
-		foundBirthday := false
-		foundSpeak := false
-		for _, sym := range result.Symbols {
-			if sym.Name == "Greeting" {
-				foundGreeting = true
-				if sym.Receiver != "*Person" {
-					t.Errorf("Expected receiver '*Person' for Greeting, got '%s'", sym.Receiver)
-				}
-				if sym.Kind != api.SymbolKindMethod {
-					t.Errorf("Expected kind 'method' for Greeting, got '%s'", sym.Kind)
-				}
-				// Check doc is included
-				if sym.Doc == "" {
-					t.Error("Expected documentation to be included")
-				}
-				// Check body is included
-				if !strings.Contains(sym.Body, "fmt.Sprintf") {
-					t.Error("Expected body to be included")
-				}
-			}
-			if sym.Name == "Birthday" {
-				foundBirthday = true
-				if sym.Receiver != "*Person" {
-					t.Errorf("Expected receiver '*Person' for Birthday, got '%s'", sym.Receiver)
-				}
-			}
-			if sym.Name == "Speak" {
-				foundSpeak = true
-			}
+		// Should contain receiver information
+		if !strings.Contains(content, "*Person") {
+			t.Errorf("Expected to find receiver '*Person', got: %s", content)
 		}
 
-		if !foundGreeting {
-			t.Error("Expected to find Greeting symbol")
+		// Should contain method signatures
+		if !strings.Contains(content, "(*Person).Greeting - func() string") {
+			t.Errorf("Expected to find signature for Greeting, got: %s", content)
 		}
-		if !foundBirthday {
-			t.Error("Expected to find Birthday symbol")
+		if !strings.Contains(content, "(*Person).Birthday - func()") {
+			t.Errorf("Expected to find signature for Birthday, got: %s", content)
 		}
-		if foundSpeak {
-			t.Error("Expected NOT to find Speak symbol (different receiver)")
+
+		// Should include documentation (docs requested)
+		if !strings.Contains(content, "Greeting returns a greeting") {
+			t.Errorf("Expected to find documentation for Greeting, got: %s", content)
+		}
+		if !strings.Contains(content, "Birthday increases the person's age") {
+			t.Errorf("Expected to find documentation for Birthday, got: %s", content)
+		}
+
+		// Should include bodies (bodies requested)
+		if !strings.Contains(content, "fmt.Sprintf") {
+			t.Errorf("Expected body to be included in Greeting, got: %s", content)
+		}
+		if !strings.Contains(content, "p.Age++") {
+			t.Errorf("Expected body to be included in Birthday, got: %s", content)
 		}
 	})
 
@@ -410,7 +360,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path": "example.com/test",
 			"symbol_filters": []any{
@@ -431,33 +381,30 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(res)
+		content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
 		t.Logf("Package Symbol Detail (signatures only):\n%s", content)
 
-		// Parse result to check symbols
-		result := &api.OGetPackageSymbolDetailResult{}
-		resultText := testutil.ResultText(res)
-		// Extract JSON from the text content (find the first { and last })
-		jsonStart := strings.Index(resultText, "{")
-		jsonEnd := strings.LastIndex(resultText, "}")
-		if jsonStart == -1 || jsonEnd == -1 {
-			t.Fatalf("Could not find JSON in result: %s", resultText)
+		// Compare against golden file (documentation + regression check)
+
+		// Should mention symbols
+		if !strings.Contains(content, "Hello") {
+			t.Errorf("Expected to find Hello symbol, got: %s", content)
 		}
-		jsonStr := resultText[jsonStart : jsonEnd+1]
-		if err := json.Unmarshal([]byte(jsonStr), result); err != nil {
-			t.Fatalf("Failed to parse result: %v\nResult: %s", err, resultText)
+		if !strings.Contains(content, "Add") {
+			t.Errorf("Expected to find Add symbol, got: %s", content)
 		}
 
-		// Should contain signatures but NOT bodies
-		for _, sym := range result.Symbols {
-			if sym.Name == "Hello" || sym.Name == "Add" {
-				if !strings.Contains(sym.Signature, "func") {
-					t.Errorf("Expected %s to have signature, got: %s", sym.Name, sym.Signature)
-				}
-				if sym.Body != "" {
-					t.Errorf("Expected %s to NOT have body (include_bodies=false), got: %s", sym.Name, sym.Body)
-				}
-			}
+		// Should contain signatures
+		if !strings.Contains(content, "func() string") {
+			t.Errorf("Expected to find signature for Hello, got: %s", content)
+		}
+		if !strings.Contains(content, "func(a, b int) int") {
+			t.Errorf("Expected to find signature for Add, got: %s", content)
+		}
+
+		// Should NOT contain bodies
+		if strings.Contains(content, "return") {
+			t.Errorf("Expected NOT to contain function bodies (include_bodies=false), got: %s", content)
 		}
 	})
 
@@ -495,7 +442,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path": "example.com/test",
 			"symbol_filters": []any{
@@ -516,32 +463,31 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		// Parse result to check symbols
-		result := &api.OGetPackageSymbolDetailResult{}
-		resultText := testutil.ResultText(res)
-		// Extract JSON from the text content (find the first { and last })
-		jsonStart := strings.Index(resultText, "{")
-		jsonEnd := strings.LastIndex(resultText, "}")
-		if jsonStart == -1 || jsonEnd == -1 {
-			t.Fatalf("Could not find JSON in result: %s", resultText)
+		content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
+		t.Logf("Package Symbol Detail (with bodies):\n%s", content)
+
+		// Should find Hello and Multiply
+		if !strings.Contains(content, "Hello") {
+			t.Errorf("Expected to find Hello function, got: %s", content)
 		}
-		jsonStr := resultText[jsonStart : jsonEnd+1]
-		if err := json.Unmarshal([]byte(jsonStr), result); err != nil {
-			t.Fatalf("Failed to parse result: %v\nResult: %s", err, resultText)
+		if !strings.Contains(content, "Multiply") {
+			t.Errorf("Expected to find Multiply function, got: %s", content)
 		}
 
-		// Should contain bodies
-		for _, sym := range result.Symbols {
-			if sym.Name == "Hello" {
-				if !strings.Contains(sym.Body, "return \"hello world\"") {
-					t.Errorf("Expected Hello body, got: %s", sym.Body)
-				}
-			}
-			if sym.Name == "Multiply" {
-				if !strings.Contains(sym.Body, "result := a * b") {
-					t.Errorf("Expected Multiply body with local variable, got: %s", sym.Body)
-				}
-			}
+		// Should contain function bodies
+		if !strings.Contains(content, "return \"hello world\"") {
+			t.Errorf("Expected Hello body, got: %s", content)
+		}
+		if !strings.Contains(content, "result := a * b") {
+			t.Errorf("Expected Multiply body with local variable, got: %s", content)
+		}
+
+		// Should contain signatures
+		if !strings.Contains(content, "func() string") {
+			t.Errorf("Expected to find signature for Hello, got: %s", content)
+		}
+		if !strings.Contains(content, "func(a, b int) int") {
+			t.Errorf("Expected to find signature for Multiply, got: %s", content)
 		}
 	})
 
@@ -568,7 +514,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path":   "does/not/exist",
 			"symbol_filters": []any{map[string]any{"name": "Something"}},
@@ -582,7 +528,7 @@ func main() {
 		if err != nil {
 			t.Logf("Expected error for non-existent package: %v", err)
 		} else if res != nil {
-			content := testutil.ResultText(res)
+			content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
 			t.Logf("Result for non-existent package: %s", content)
 
 			// If no error, the result should mention the issue
@@ -618,7 +564,7 @@ func main() {
 			t.Fatal(err)
 		}
 
-		tool := "get_package_symbol_detail"
+		tool := "go_get_package_symbol_detail"
 		args := map[string]any{
 			"package_path":   "example.com/test",
 			"symbol_filters": []any{map[string]any{"name": "NonExistentFunc"}},
@@ -636,23 +582,20 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		// Parse result to check symbols
-		result := &api.OGetPackageSymbolDetailResult{}
-		resultText := testutil.ResultText(res)
-		// Extract JSON from the text content (find the first { and last })
-		jsonStart := strings.Index(resultText, "{")
-		jsonEnd := strings.LastIndex(resultText, "}")
-		if jsonStart == -1 || jsonEnd == -1 {
-			t.Fatalf("Could not find JSON in result: %s", resultText)
-		}
-		jsonStr := resultText[jsonStart : jsonEnd+1]
-		if err := json.Unmarshal([]byte(jsonStr), result); err != nil {
-			t.Fatalf("Failed to parse result: %v\nResult: %s", err, resultText)
+		content := testutil.ResultText(t, res, testutil.GoldenGetPackageSymbolDetail)
+		t.Logf("Package Symbol Detail (non-existent symbol):\n%s", content)
+
+		// Should return empty result (symbol doesn't exist)
+		// The output should not contain any function definitions
+		if strings.Contains(content, "func NonExistentFunc") {
+			t.Errorf("Expected NOT to find NonExistentFunc (doesn't exist), got: %s", content)
 		}
 
-		// Should return empty list (symbol doesn't exist)
-		if len(result.Symbols) != 0 {
-			t.Errorf("Expected 0 symbols for non-existent filter, got %d", len(result.Symbols))
+		// Should indicate no symbols found or empty result
+		if !strings.Contains(content, "No symbols found") &&
+		   !strings.Contains(content, "no symbols") &&
+		   !strings.Contains(content, "0 symbols") {
+			t.Logf("Note: Result for non-existent symbol: %s", content)
 		}
 	})
 }

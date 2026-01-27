@@ -9,7 +9,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"strings"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"golang.org/x/tools/gopls/internal/cache"
@@ -22,6 +23,53 @@ import (
 )
 
 // ===== Test Helpers =====
+
+// loadTestDataFiles loads all files from a testdata subdirectory
+func loadTestDataFiles(t *testing.T, testdataDir string) map[string][]byte {
+	t.Helper()
+
+	dirPath := filepath.Join("testdata", testdataDir)
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		t.Fatalf("failed to read testdata directory %s: %v", dirPath, err)
+	}
+
+	files := make(map[string][]byte)
+	// Always add go.mod
+	files["go.mod"] = []byte("module example.com\nGo 1.21\n")
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// For subdirectories (like multi-package tests)
+			subDirPath := filepath.Join(dirPath, entry.Name())
+			subEntries, err := os.ReadDir(subDirPath)
+			if err != nil {
+				t.Fatalf("failed to read subdirectory %s: %v", subDirPath, err)
+			}
+			for _, subEntry := range subEntries {
+				if !subEntry.IsDir() {
+					filePath := filepath.Join(subDirPath, subEntry.Name())
+					content, err := os.ReadFile(filePath)
+					if err != nil {
+						t.Fatalf("failed to read file %s: %v", filePath, err)
+					}
+					relPath := filepath.Join(entry.Name(), subEntry.Name())
+					files[relPath] = content
+				}
+			}
+		} else {
+			// For files in the root testdata directory
+			filePath := filepath.Join(dirPath, entry.Name())
+			content, err := os.ReadFile(filePath)
+			if err != nil {
+				t.Fatalf("failed to read file %s: %v", filePath, err)
+			}
+			files[entry.Name()] = content
+		}
+	}
+
+	return files
+}
 
 type llmTestFixtures struct {
 	sandbox  *fake.Sandbox
@@ -62,483 +110,6 @@ func setupLLMTest(t *testing.T, files map[string][]byte) *llmTestFixtures {
 func (f *llmTestFixtures) cleanup() {
 	f.release()
 	f.sandbox.Close()
-}
-
-func (f *llmTestFixtures) runImplTest(t *testing.T, locator api.SymbolLocator) []SourceContext {
-	t.Helper()
-	implementations, err := LLMImplementation(f.ctx, f.snapshot, locator)
-	if err != nil {
-		t.Fatalf("LLMImplementation failed: %v", err)
-	}
-	return implementations
-}
-
-// ===== Single Table-Driven Test for LLMImplementation =====
-
-func TestLLMImplementation(t *testing.T) {
-	testenv.NeedsGoPackages(t)
-
-	tests := []struct {
-		name        string
-		files       map[string]string // source files as strings (converted to []byte)
-		locator     api.SymbolLocator
-		minImpls    int
-		findSig     string // optional: substring to find in signature
-		checkFields bool   // verify SourceContext fields
-		expectErr   bool   // whether LLMImplementation should return error
-	}{
-		{
-			name: "basic interface",
-			files: map[string]string{
-				"main.go": `package main
-type Shape interface { Area() float64 }
-type Circle struct { Radius float64 }
-func (c Circle) Area() float64 { return 3.14 * c.Radius * c.Radius }
-func main() { var s Shape = Circle{Radius: 10}; _ = s.Area() }`,
-			},
-			locator:     api.SymbolLocator{SymbolName: "Area", ParentScope: "Shape", Kind: "method"},
-			minImpls:    1,
-			findSig:     "Circle",
-			checkFields: true,
-		},
-		{
-			name: "multiple implementations",
-			files: map[string]string{
-				"main.go": `package main
-type Writer interface { Write([]byte) (int, error) }
-type File struct { path string }
-func (f *File) Write(p []byte) (int, error) { return len(p), nil }
-type Buffer struct { data []byte }
-func (b *Buffer) Write(p []byte) (int, error) { b.data = append(b.data, p...); return len(p), nil }
-type Network struct { addr string }
-func (n *Network) Write(p []byte) (int, error) { return len(p), nil }
-func main() { var w Writer = &File{}; w.Write(nil) }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Write", ParentScope: "Writer", Kind: "method"},
-			minImpls: 3,
-			findSig:  "File",
-		},
-		{
-			name: "multi-package",
-			files: map[string]string{
-				"interfaces/io.go": `package interfaces; type Reader interface { Read() ([]byte, error) }`,
-				"reader/file.go":   `package reader; import "example.com/interfaces"; type File struct { path string }; func (f *File) Read() ([]byte, error) { return []byte("hello"), nil }; var _ interfaces.Reader = (*File)(nil)`,
-				"reader/memory.go": `package reader; import "example.com/interfaces"; type Memory struct { data []byte }; func (m *Memory) Read() ([]byte, error) { return m.data, nil }; var _ interfaces.Reader = (*Memory)(nil)`,
-				"main.go":          `package main; import "example.com/interfaces"; func main() { var _ interfaces.Reader }`,
-			},
-			// Use the interfaces/io.go file as context since that's where the interface is defined
-			locator: api.SymbolLocator{
-				SymbolName: "Read",
-				Kind:       "method",
-			},
-			minImpls: 2,
-		},
-		{
-			name: "empty implementations",
-			files: map[string]string{
-				"main.go": `package main
-type UnusedInterface interface { DoSomething() }
-func main() { var _ UnusedInterface }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "DoSomething", ParentScope: "UnusedInterface", Kind: "method"},
-			minImpls: 0,
-		},
-		{
-			name: "nested interfaces",
-			files: map[string]string{
-				"main.go": `package main
-type Readable interface { Read() ([]byte, error) }
-type Writable interface { Write([]byte) (int, error) }
-type ReadWritable interface { Readable; Writable }
-type Buffer struct { data []byte }
-func (b *Buffer) Read() ([]byte, error) { return b.data, nil }
-func (b *Buffer) Write(p []byte) (int, error) { b.data = append(b.data, p...); return len(p), nil }
-func main() { var _ ReadWritable = &Buffer{} }`,
-			},
-			locator:     api.SymbolLocator{SymbolName: "Read", ParentScope: "Readable", Kind: "method"},
-			minImpls:    1,
-			findSig:     "Buffer",
-			checkFields: true,
-		},
-		{
-			name: "complex signatures",
-			files: map[string]string{
-				"main.go": `package main
-import ("context"; "io")
-type Processor interface { Process(ctx context.Context, r io.Reader, opts map[string]interface{}) (<-chan []byte, error) }
-type AsyncProcessor struct { bufSize int }
-func (a *AsyncProcessor) Process(ctx context.Context, r io.Reader, opts map[string]interface{}) (<-chan []byte, error) { return nil, nil }
-func main() { var _ Processor = &AsyncProcessor{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Process", ParentScope: "Processor", Kind: "method"},
-			minImpls: 1,
-			findSig:  "AsyncProcessor",
-		},
-		{
-			name: "variadic methods",
-			files: map[string]string{
-				"main.go": `package main
-type Logger interface { Log(msg string, args ...interface{}) }
-type ConsoleLogger struct { prefix string }
-func (c *ConsoleLogger) Log(msg string, args ...interface{}) {}
-func main() { var _ Logger = &ConsoleLogger{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Log", ParentScope: "Logger", Kind: "method"},
-			minImpls: 1,
-			findSig:  "ConsoleLogger",
-		},
-		{
-			name: "error return types",
-			files: map[string]string{
-				"main.go": `package main
-type Repository interface { Get(id string) (interface{}, error) }
-type MockRepository struct {}
-func (m *MockRepository) Get(id string) (interface{}, error) { return nil, nil }
-func main() { var _ Repository = &MockRepository{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Get", ParentScope: "Repository", Kind: "method"},
-			minImpls: 1,
-			findSig:  "MockRepository",
-		},
-		{
-			name: "pointer vs value receivers",
-			files: map[string]string{
-				"main.go": `package main
-type Processor interface { Process() string }
-type ValueReceiver struct { name string }
-func (v ValueReceiver) Process() string { return "value: " + v.name }
-type PointerReceiver struct { name string }
-func (p *PointerReceiver) Process() string { return "pointer: " + p.name }
-func main() { var p1 Processor = ValueReceiver{name: "a"}; var p2 Processor = &PointerReceiver{name: "b"}; _ = p1.Process(); _ = p2.Process() }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Process", ParentScope: "Processor", Kind: "method"},
-			minImpls: 2,
-			findSig:  "Receiver",
-		},
-		{
-			name: "generic types",
-			files: map[string]string{
-				"main.go": `package main
-type Container[T any] interface { Put(value T) }
-type Box[T any] struct { value T }
-func (b *Box[T]) Put(value T) { b.value = value }
-type Slice[T any] struct { items []T }
-func (s *Slice[T]) Put(value T) { s.items = append(s.items, value) }
-func main() { var c Container[int] = &Box[int]{}; c.Put(42) }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Put", ParentScope: "Container", Kind: "method"},
-			minImpls: 2,
-		},
-		{
-			name: "io.Reader standard interface",
-			files: map[string]string{
-				"main.go": `package main
-type Reader interface { Read(p []byte) (int, error) }
-type MyReader struct { data []byte }
-func (m *MyReader) Read(p []byte) (int, error) { if len(m.data) == 0 { return 0, nil }; copy(p, m.data); m.data = nil; return len(p), nil }
-func main() { var _ Reader = &MyReader{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Read", ParentScope: "Reader", Kind: "method"},
-			minImpls: 1, findSig: "MyReader",
-		},
-		{
-			name: "error interface",
-			files: map[string]string{
-				"main.go": `package main
-type MyError interface { Error() string }
-type CustomError struct { msg string }
-func (e *CustomError) Error() string { return e.msg }
-func main() { var _ MyError = &CustomError{msg: "failed"} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Error", ParentScope: "MyError", Kind: "method"},
-			minImpls: 1, findSig: "CustomError",
-		},
-		{
-			name: "fmt.Stringer interface",
-			files: map[string]string{
-				"main.go": `package main
-type Stringer interface { String() string }
-type Person struct { Name string }
-func (p Person) String() string { return "Person: " + p.Name }
-func main() { var _ Stringer = Person{Name: "Alice"} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "String", ParentScope: "Stringer", Kind: "method"},
-			minImpls: 1, findSig: "Person",
-		},
-		{
-			name: "ambiguous method names - same method different interfaces",
-			files: map[string]string{
-				"main.go": `package main
-type Readable interface { Read() ([]byte, error) }
-type Writable interface { Read() ([]byte, error) }
-type Buffer struct { data []byte }
-func (b *Buffer) Read() ([]byte, error) { return b.data, nil }
-func (b *Buffer) Read() ([]byte, error) { return nil, nil }
-func main() { var r Readable = &Buffer{}; var _ Writable = &Buffer{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Read", ParentScope: "Readable", Kind: "method"},
-			minImpls: 1, findSig: "Buffer",
-		},
-		{
-			name: "method promotion from embedded struct",
-			files: map[string]string{
-				"main.go": `package main
-type Handler interface { Method() string }
-type Base struct { Name string }
-func (b Base) Method() string { return b.Name }
-type Wrapper struct { Base }
-func main() { w := Wrapper{Base{Name: "test"}}; var _ Handler = w }`,
-			},
-			locator:     api.SymbolLocator{SymbolName: "Method", ParentScope: "Handler", Kind: "method"},
-			minImpls:    0, // Method promotion might not be detected, so we accept 0 or more
-			checkFields: false,
-		},
-		{
-			name: "anonymous struct implementing interface",
-			files: map[string]string{
-				"main.go": `package main
-type Handler interface { Handle() }
-func main() { h := struct{}{}; h.Handle = func() {}; var _ Handler = h }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Handle", Kind: "method"},
-			minImpls: 0, // anonymous struct implementations might not be detected
-		},
-		{
-			name: "multiple methods - test each",
-			files: map[string]string{
-				"main.go": `package main
-type ReadWriter interface { Read() ([]byte, error); Write([]byte) (int, error); Close() error }
-type Buffer struct { data []byte }
-func (b *Buffer) Read() ([]byte, error) { return b.data, nil }
-func (b *Buffer) Write(p []byte) (int, error) { b.data = append(b.data, p...); return len(p), nil }
-func (b *Buffer) Close() error { b.data = nil; return nil }
-func main() { var _ ReadWriter = &Buffer{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Close", ParentScope: "ReadWriter", Kind: "method"},
-			minImpls: 1, findSig: "Buffer",
-		},
-		{
-			name: "method with no return value",
-			files: map[string]string{
-				"main.go": `package main
-type Initializer interface { Init() }
-type Service struct { name string }
-func (s *Service) Init() { s.name = "initialized" }
-func main() { var _ Initializer = &Service{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Init", ParentScope: "Initializer", Kind: "method"},
-			minImpls: 1, findSig: "Service",
-		},
-		{
-			name: "complex generics with constraints",
-			files: map[string]string{
-				"main.go": `package main
-type Comparable[T comparable] interface { Compare(other T) int }
-type Number struct { val int }
-func (n Number) Compare(other Number) int { if n.val < other.val { return -1 }; if n.val > other.val { return 1 }; return 0 }
-func main() { var _ Comparable[int] = Number{val: 5} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Compare", Kind: "method"},
-			minImpls: 1, findSig: "Number",
-		},
-		{
-			name: "multiple type parameters",
-			files: map[string]string{
-				"main.go": `package main
-type Mapper[K comparable, V any] interface { Get(key K) (V, bool); Set(key K, value V) }
-type HashMap[K comparable, V any] struct { data map[K]V }
-func (m *HashMap[K, V]) Get(key K) (V, bool) { val, ok := m.data[key]; return val, ok }
-func (m *HashMap[K, V]) Set(key K, value V) { if m.data == nil { m.data = make(map[K]V) }; m.data[key] = value }
-func main() { var _ Mapper[string, int] = &HashMap[string, int]{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Get", Kind: "method"},
-			minImpls: 1, findSig: "HashMap",
-		},
-		{
-			name: "many implementations (stress test)",
-			files: map[string]string{
-				"main.go": `package main
-type Writer interface { Write([]byte) (int, error) }
-type W1 struct{}; func (w *W1) Write(p []byte) (int, error) { return len(p), nil }
-type W2 struct{}; func (w *W2) Write(p []byte) (int, error) { return len(p), nil }
-type W3 struct{}; func (w *W3) Write(p []byte) (int, error) { return len(p), nil }
-type W4 struct{}; func (w *W4) Write(p []byte) (int, error) { return len(p), nil }
-type W5 struct{}; func (w *W5) Write(p []byte) (int, error) { return len(p), nil }
-func main() { var _ Writer = &W1{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Write", ParentScope: "Writer", Kind: "method"},
-			minImpls: 5,
-		},
-		{
-			name: "deeply nested interface hierarchy",
-			files: map[string]string{
-				"main.go": `package main
-type Base interface { BaseMethod() string }
-type Middle1 interface { Base; M1() }
-type Middle2 interface { Middle1; M2() }
-type Final interface { Middle2; M3() }
-type Impl struct{}
-func (i Impl) BaseMethod() string { return "base" }
-func (i Impl) M1() {}
-func (i Impl) M2() {}
-func (i Impl) M3() {}
-func main() { var _ Final = Impl{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "BaseMethod", ParentScope: "Base", Kind: "method"},
-			minImpls: 1, findSig: "Impl",
-		},
-		{
-			name: "symbol not found - should error",
-			files: map[string]string{
-				"main.go": `package main
-type MyInterface interface { DoSomething() }
-func main() {}`,
-			},
-			locator:   api.SymbolLocator{SymbolName: "NonExistentMethod", ParentScope: "MyInterface", Kind: "method"},
-			expectErr: true, // LLMImplementation should error
-		},
-		{
-			name: "sort.Interface implementation",
-			files: map[string]string{
-				"main.go": `package main
-type Sortable interface { Len() int; Less(i, j int) bool; Swap(i, j int) }
-type Person []string
-func (p Person) Len() int { return len(p) }
-func (p Person) Less(i, j int) bool { return p[i] < p[j] }
-func (p Person) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-func main() { sort.Sort(Person{}) }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Len", ParentScope: "Sortable", Kind: "method"},
-			minImpls: 1, findSig: "Person",
-		},
-		{
-			name: "pointer receiver with nil safety",
-			files: map[string]string{
-				"main.go": `package main
-type Closer interface { Close() error }
-type File struct { path string }
-func (f *File) Close() error { return nil }
-func main() { var _ Closer = &File{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Close", ParentScope: "Closer", Kind: "method"},
-			minImpls: 1, findSig: "File",
-		},
-		{
-			name: "multi-file same package implementations",
-			files: map[string]string{
-				"interfaces.go": `package main
-type Writer interface { Write([]byte) (int, error) }`,
-				"file1.go": `package main
-type FileWriter1 struct { path string }
-func (f *FileWriter1) Write(p []byte) (int, error) { return len(p), nil }`,
-				"file2.go": `package main
-type FileWriter2 struct { path string }
-func (f *FileWriter2) Write(p []byte) (int, error) { return len(p), nil }`,
-				"main.go": `package main
-func main() { var _ Writer = &FileWriter1{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Write", ParentScope: "Writer", Kind: "method"},
-			minImpls: 2,
-		},
-		{
-			name: "test file implementations",
-			files: map[string]string{
-				"service.go": `package main
-type Service interface { Start() error; Stop() error }
-type RealService struct { name string }
-func (s *RealService) Start() error { return nil }
-func (s *RealService) Stop() error { return nil }`,
-				"service_test.go": `package main
-import "testing"
-type MockService struct { started bool }
-func (m *MockService) Start() error { m.started = true; return nil }
-func (m *MockService) Stop() error { m.started = false; return nil }
-func TestService(t *testing.T) { var _ Service = &MockService{} }`,
-				"main.go": `package main
-func main() { var _ Service = &RealService{} }`,
-			},
-			locator:  api.SymbolLocator{SymbolName: "Start", ParentScope: "Service", Kind: "method"},
-			minImpls: 2, // Should find both RealService and MockService
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Convert map[string]string to map[string][]byte
-			files := make(map[string][]byte, len(tt.files)+1)
-			files["go.mod"] = []byte("module example.com\ngo 1.21\n")
-			for k, v := range tt.files {
-				files[k] = []byte(v)
-			}
-
-			fix := setupLLMTest(t, files)
-			defer fix.cleanup()
-
-			locator := tt.locator
-			// For multi-package tests, set a specific context file
-			if tt.name == "multi-package" {
-				// Use interfaces/io.go as context since that's where Reader interface is
-				interfacesPath := fix.sandbox.Workdir.AbsPath("interfaces/io.go")
-				locator.ContextFile = interfacesPath
-				locator.ParentScope = "Reader"
-			} else if locator.ContextFile == "" {
-				locator.ContextFile = fix.mainPath
-			}
-
-			// For multi-file same package, set context to interfaces.go
-			if tt.name == "multi-file same package implementations" {
-				interfacesPath := fix.sandbox.Workdir.AbsPath("interfaces.go")
-				locator.ContextFile = interfacesPath
-			}
-
-			// For test file implementations, set context to service.go
-			if tt.name == "test file implementations" {
-				servicePath := fix.sandbox.Workdir.AbsPath("service.go")
-				locator.ContextFile = servicePath
-			}
-
-			implementations, err := LLMImplementation(fix.ctx, fix.snapshot, locator)
-
-			// Handle expected errors
-			if tt.expectErr {
-				if err == nil {
-					t.Errorf("Expected error for non-existent symbol, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("LLMImplementation failed: %v", err)
-			}
-
-			if len(implementations) < tt.minImpls {
-				t.Errorf("Expected at least %d implementations, found %d", tt.minImpls, len(implementations))
-			}
-
-			if tt.findSig != "" && len(implementations) > 0 {
-				found := false
-				for _, impl := range implementations {
-					if strings.Contains(impl.Signature, tt.findSig) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("No implementation found with signature containing %q", tt.findSig)
-				}
-			}
-
-			if tt.checkFields && len(implementations) > 0 {
-				impl := implementations[0]
-				if impl.File == "" || impl.Symbol == "" || impl.Signature == "" || impl.Snippet == "" {
-					t.Errorf("Missing required fields")
-				}
-				if impl.StartLine <= 0 || impl.EndLine < impl.StartLine {
-					t.Errorf("Invalid line numbers: StartLine=%d EndLine=%d", impl.StartLine, impl.EndLine)
-				}
-			}
-		})
-	}
 }
 
 // ===== ResolveNode and other tests =====
@@ -647,7 +218,7 @@ func main() {
 			locator: api.SymbolLocator{
 				SymbolName:  "Println",
 				ContextFile: mainGoPath,
-				PackageName: "fmt",
+				PackageIdentifier: "fmt",
 			},
 			wantName: "Println",
 			wantKind: "function",
