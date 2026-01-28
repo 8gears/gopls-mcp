@@ -215,7 +215,7 @@ func handleGetPackageSymbolDetail(ctx context.Context, h *Handler, req *mcp.Call
 				continue
 			}
 
-			converted := convertDocumentSymbol(sym, uri.Path())
+			converted := convertDocumentSymbol(sym, uri.Path(), input.PackagePath)
 
 			// Add documentation from AST
 			if includeDocs {
@@ -506,12 +506,27 @@ func handleGoSearch(ctx context.Context, h *Handler, req *mcp.CallToolRequest, i
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: result.Summary}}}, result, nil
 	}
 
-	// If Cwd is provided, ensure the view exists first (for test mode)
+	var snapshot *cache.Snapshot
+	var release func()
+	var err error
+
+	// Use Cwd if provided, otherwise use default view
 	if input.Cwd != "" {
-		_, err := h.viewForDir(input.Cwd)
+		view, err := h.viewForDir(input.Cwd)
 		if err != nil {
 			return nil, nil, err
 		}
+		snapshot, release, err = view.Snapshot()
+		if err != nil {
+			return nil, nil, err
+		}
+		defer release()
+	} else {
+		snapshot, release, err = h.snapshot()
+		if err != nil {
+			return nil, nil, err
+		}
+		defer release()
 	}
 
 	// Use LSP server's Symbol method (searches all views)
@@ -548,11 +563,18 @@ func handleGoSearch(ctx context.Context, h *Handler, req *mcp.CallToolRequest, i
 			line = int(sym.Location.Range.Start.Line + 1)
 		}
 
+		// Extract package path for this symbol using metadata
+		pkgPath := ""
+		if mps, err := snapshot.MetadataForFile(ctx, sym.Location.URI, false); err == nil && len(mps) > 0 {
+			pkgPath = string(mps[0].PkgPath)
+		}
+
 		symbols = append(symbols, &api.Symbol{
-			Name:     sym.Name,
-			Kind:     kind,
-			FilePath: sym.Location.URI.Path(),
-			Line:     line,
+			Name:        sym.Name,
+			Kind:        kind,
+			PackagePath: pkgPath,
+			FilePath:    sym.Location.URI.Path(),
+			Line:        line,
 			// Note: We don't extract signature/docs here for performance
 			// User can call get_package_symbol_detail or go_definition for full info
 		})
@@ -634,6 +656,62 @@ func handleGoDefinition(ctx context.Context, h *Handler, req *mcp.CallToolReques
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}}, result, nil
 }
 
+// cleanDocumentation filters out pkg.go.dev markdown links from documentation strings.
+// golang.Hover() returns docs with links like [`Func` on pkg.go.dev](https://pkg.go.dev/...)
+// which add clutter. This function removes those links, keeping only the actual docs.
+//
+// The go doc link is useless and give LLM wrong direction to retrieve Details
+// from network instead of relying on current MCP server to retrieve them.
+// Hence, we clean the possible link.
+func cleanDocumentation(docLines []string) string {
+	var cleaned []string
+	for _, line := range docLines {
+		trimmed := strings.TrimSpace(line)
+		// Skip pkg.go.dev markdown links
+		if strings.Contains(trimmed, "pkg.go.dev") || strings.Contains(trimmed, "[`") {
+			// Check if the line is primarily a pkg.go.dev link
+			if strings.HasPrefix(trimmed, "[`") && strings.Contains(trimmed, "](") {
+				continue // Skip this line entirely
+			}
+			// Try to clean the line by removing markdown links
+			cleanedLine := trimmed
+			// Remove markdown links like [`text`](url)
+			for {
+				start := strings.Index(cleanedLine, "[`")
+				if start == -1 {
+					break
+				}
+				end := strings.Index(cleanedLine[start:], "](")
+				if end == -1 {
+					break
+				}
+				end += start
+				linkEnd := strings.Index(cleanedLine[end:], ")")
+				if linkEnd == -1 {
+					break
+				}
+				linkEnd += end
+				// Extract the text between [` and `]
+				textStart := start + 2
+				textEnd := strings.Index(cleanedLine[textStart:], "`]")
+				if textEnd == -1 {
+					break
+				}
+				textEnd += textStart
+				text := cleanedLine[textStart:textEnd]
+				// Replace the markdown link with just the text
+				cleanedLine = cleanedLine[:start] + text + cleanedLine[linkEnd+1:]
+			}
+			if cleanedLine != "" {
+				cleaned = append(cleaned, cleanedLine)
+			}
+		} else if trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	return strings.Join(cleaned, "\n")
+}
+
 // extractSymbolAtDefinition extracts symbol information (name, kind, signature, docs, body)
 // at the given definition location using golang.Hover() and AST parsing.
 func extractSymbolAtDefinition(ctx context.Context, snapshot *cache.Snapshot, loc protocol.Location, includeBody bool) *api.Symbol {
@@ -684,7 +762,8 @@ func extractSymbolAtDefinition(ctx context.Context, snapshot *cache.Snapshot, lo
 			codeLines = append(codeLines, line)
 		} else {
 			line = strings.TrimSpace(line)
-			if line != "" {
+			// Skip empty lines and common markdown separators
+			if line != "" && line != "---" && line != "***" && line != "___" {
 				docLines = append(docLines, line)
 			}
 		}
@@ -693,7 +772,7 @@ func extractSymbolAtDefinition(ctx context.Context, snapshot *cache.Snapshot, lo
 	if len(codeLines) > 0 {
 		signature = strings.Join(codeLines, "\n")
 	}
-	documentation = strings.Join(docLines, "\n")
+	documentation = cleanDocumentation(docLines)
 
 	// Extract name, receiver, and kind from signature
 	name := "<symbol>"
@@ -1408,6 +1487,12 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 
 	item := items[0]
 
+	// Extract package path for this symbol
+	pkgPath := ""
+	if mps, err := snapshot.MetadataForFile(ctx, item.URI, false); err == nil && len(mps) > 0 {
+		pkgPath = string(mps[0].PkgPath)
+	}
+
 	// Extract rich symbol information using the existing helper
 	// This gives us signature, documentation, receiver info, etc.
 	loc := protocol.Location{
@@ -1418,10 +1503,11 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 
 	// Build the symbol - use rich info if available, otherwise fall back to basic info
 	symbol := api.Symbol{
-		Name:     item.Name,
-		Kind:     golang.ConvertLSPSymbolKind(item.Kind),
-		FilePath: item.URI.Path(),
-		Line:     int(item.Range.Start.Line + 1),
+		Name:        item.Name,
+		Kind:        golang.ConvertLSPSymbolKind(item.Kind),
+		PackagePath: pkgPath,
+		FilePath:    item.URI.Path(),
+		Line:        int(item.Range.Start.Line + 1),
 	}
 
 	// Add rich details if extraction succeeded
@@ -1430,6 +1516,10 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 		symbol.Doc = richSymbol.Doc
 		symbol.Receiver = richSymbol.Receiver
 		symbol.Body = richSymbol.Body
+		// Use PackagePath from richSymbol if available (it may have extracted it from hover)
+		if richSymbol.PackagePath != "" {
+			symbol.PackagePath = richSymbol.PackagePath
+		}
 	}
 
 	result := &api.OCallHierarchyResult{
@@ -1445,11 +1535,38 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 		if err == nil && len(incoming) > 0 {
 			incomingCalls := make([]api.CallHierarchyCall, 0, len(incoming))
 			for _, call := range incoming {
+				// Extract rich symbol information for the caller
+				loc := protocol.Location{
+					URI:   call.From.URI,
+					Range: call.From.Range,
+				}
+				richSymbol := extractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default
+
+				// Extract package path for this symbol
+				pkgPath := ""
+				if pkg, _, err := golang.NarrowestPackageForFile(ctx, snapshot, call.From.URI); err == nil && pkg != nil {
+					pkgPath = string(pkg.Metadata().PkgPath)
+				}
+
+				// Build the symbol with rich info if available
 				from := api.Symbol{
-					Name:     call.From.Name,
-					Kind:     golang.ConvertLSPSymbolKind(call.From.Kind),
-					FilePath: call.From.URI.Path(),
-					Line:     int(call.From.Range.Start.Line + 1),
+					Name:        call.From.Name,
+					Kind:        golang.ConvertLSPSymbolKind(call.From.Kind),
+					PackagePath: pkgPath,
+					FilePath:    call.From.URI.Path(),
+					Line:        int(call.From.Range.Start.Line + 1),
+				}
+
+				// Add rich details if extraction succeeded
+				if richSymbol != nil && richSymbol.Name != "<symbol>" {
+					from.Signature = richSymbol.Signature
+					from.Doc = richSymbol.Doc
+					from.Receiver = richSymbol.Receiver
+					from.Body = richSymbol.Body
+					// Use PackagePath from richSymbol if available
+					if richSymbol.PackagePath != "" {
+						from.PackagePath = richSymbol.PackagePath
+					}
 				}
 
 				callRanges := make([]api.CallRange, 0, len(call.FromRanges))
@@ -1477,11 +1594,38 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 		if err == nil && len(outgoing) > 0 {
 			outgoingCalls := make([]api.CallHierarchyCall, 0, len(outgoing))
 			for _, call := range outgoing {
+				// Extract rich symbol information for the callee
+				loc := protocol.Location{
+					URI:   call.To.URI,
+					Range: call.To.Range,
+				}
+				richSymbol := extractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default
+
+				// Extract package path for this symbol
+				pkgPath := ""
+				if pkg, _, err := golang.NarrowestPackageForFile(ctx, snapshot, call.To.URI); err == nil && pkg != nil {
+					pkgPath = string(pkg.Metadata().PkgPath)
+				}
+
+				// Build the symbol with rich info if available
 				to := api.Symbol{
-					Name:     call.To.Name,
-					Kind:     golang.ConvertLSPSymbolKind(call.To.Kind),
-					FilePath: call.To.URI.Path(),
-					Line:     int(call.To.Range.Start.Line + 1),
+					Name:        call.To.Name,
+					Kind:        golang.ConvertLSPSymbolKind(call.To.Kind),
+					PackagePath: pkgPath,
+					FilePath:    call.To.URI.Path(),
+					Line:        int(call.To.Range.Start.Line + 1),
+				}
+
+				// Add rich details if extraction succeeded
+				if richSymbol != nil && richSymbol.Name != "<symbol>" {
+					to.Signature = richSymbol.Signature
+					to.Doc = richSymbol.Doc
+					to.Receiver = richSymbol.Receiver
+					to.Body = richSymbol.Body
+					// Use PackagePath from richSymbol if available
+					if richSymbol.PackagePath != "" {
+						to.PackagePath = richSymbol.PackagePath
+					}
 				}
 
 				callRanges := make([]api.CallRange, 0, len(call.FromRanges))
@@ -1507,7 +1651,39 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 	if result.TotalIncoming > 0 {
 		summary.WriteString(fmt.Sprintf("Incoming Calls (%d):\n", result.TotalIncoming))
 		for i, call := range result.IncomingCalls {
+			// Format: "  1. functionName at file.go:123"
 			summary.WriteString(fmt.Sprintf("  %d. %s at %s:%d\n", i+1, call.From.Name, call.From.FilePath, call.From.Line))
+
+			// Add package path if available (clean format without pkg.go.dev links)
+			if call.From.PackagePath != "" {
+				summary.WriteString(fmt.Sprintf("     package: %s\n", call.From.PackagePath))
+			}
+
+			// Add signature if available
+			if call.From.Signature != "" {
+				// Indent the signature
+				sigLines := strings.Split(call.From.Signature, "\n")
+				for _, sigLine := range sigLines {
+					if sigLine != "" {
+						summary.WriteString(fmt.Sprintf("     %s\n", sigLine))
+					}
+				}
+			}
+
+			// Add documentation if available (first line only for brevity)
+			if call.From.Doc != "" {
+				docLines := strings.Split(call.From.Doc, "\n")
+				// Find first non-empty line
+				for _, docLine := range docLines {
+					trimmed := strings.TrimSpace(docLine)
+					if trimmed != "" {
+						summary.WriteString(fmt.Sprintf("     // %s\n", trimmed))
+						break
+					}
+				}
+			}
+
+			// Add call count if multiple call ranges
 			if len(call.CallRanges) > 1 {
 				summary.WriteString(fmt.Sprintf("     (called %d times)\n", len(call.CallRanges)))
 			}
@@ -1520,7 +1696,39 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 	if result.TotalOutgoing > 0 {
 		summary.WriteString(fmt.Sprintf("Outgoing Calls (%d):\n", result.TotalOutgoing))
 		for i, call := range result.OutgoingCalls {
+			// Format: "  1. functionName at file.go:123"
 			summary.WriteString(fmt.Sprintf("  %d. %s at %s:%d\n", i+1, call.From.Name, call.From.FilePath, call.From.Line))
+
+			// Add package path if available (clean format without pkg.go.dev links)
+			if call.From.PackagePath != "" {
+				summary.WriteString(fmt.Sprintf("     package: %s\n", call.From.PackagePath))
+			}
+
+			// Add signature if available
+			if call.From.Signature != "" {
+				// Indent the signature
+				sigLines := strings.Split(call.From.Signature, "\n")
+				for _, sigLine := range sigLines {
+					if sigLine != "" {
+						summary.WriteString(fmt.Sprintf("     %s\n", sigLine))
+					}
+				}
+			}
+
+			// Add documentation if available (first line only for brevity)
+			if call.From.Doc != "" {
+				docLines := strings.Split(call.From.Doc, "\n")
+				// Find first non-empty line
+				for _, docLine := range docLines {
+					trimmed := strings.TrimSpace(docLine)
+					if trimmed != "" {
+						summary.WriteString(fmt.Sprintf("     // %s\n", trimmed))
+						break
+					}
+				}
+			}
+
+			// Add call count if multiple call ranges
 			if len(call.CallRanges) > 1 {
 				summary.WriteString(fmt.Sprintf("     (called %d times)\n", len(call.CallRanges)))
 			}

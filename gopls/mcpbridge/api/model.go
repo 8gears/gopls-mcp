@@ -281,6 +281,11 @@ type Symbol struct {
 
 	// Implementation (The Physical Fields) -------------------------------
 
+	// PackagePath is the import path of the package containing this symbol.
+	// Example: "net/http", "github.com/user/project/pkg"
+	// This is crucial for distinguishing symbols with the same name from different packages.
+	PackagePath string `json:"package_path,omitempty" jsonschema:"import path of the package containing the symbol"`
+
 	// FilePath is the relative path to the source file.
 	FilePath string `json:"file_path" jsonschema:"source file path"`
 

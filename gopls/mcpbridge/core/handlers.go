@@ -583,7 +583,7 @@ func handleListPackageSymbols(ctx context.Context, h *Handler, req *mcp.CallTool
 				continue
 			}
 
-			converted := convertDocumentSymbol(sym, uri.Path())
+			converted := convertDocumentSymbol(sym, uri.Path(), input.PackagePath)
 
 			// Add documentation from AST
 			if includeDocs {
@@ -1255,7 +1255,7 @@ func extractPackageInfo(ctx context.Context, snapshot *cache.Snapshot, mp *metad
 
 		for _, sym := range symbols {
 			if isExported(sym.Name) {
-				pkg.Symbols = append(pkg.Symbols, convertDocumentSymbol(sym, uri.Path()))
+				pkg.Symbols = append(pkg.Symbols, convertDocumentSymbol(sym, uri.Path(), string(mp.PkgPath)))
 			}
 		}
 	}
@@ -1293,7 +1293,7 @@ func extractPackageDocs(ctx context.Context, snapshot *cache.Snapshot, mp *metad
 
 // convertDocumentSymbol converts LSP DocumentSymbol to our MCP Symbol type.
 // Based on: gopls/internal/protocol/document_symbols.go
-func convertDocumentSymbol(ds protocol.DocumentSymbol, filePath string) api.Symbol {
+func convertDocumentSymbol(ds protocol.DocumentSymbol, filePath, packagePath string) api.Symbol {
 	// Extract receiver and parent info from the symbol detail/name
 	receiver, parent := "", ""
 	detail := ds.Detail
@@ -1337,13 +1337,14 @@ func convertDocumentSymbol(ds protocol.DocumentSymbol, filePath string) api.Symb
 	}
 
 	sym := api.Symbol{
-		Name:      ds.Name,
-		Kind:      convertSymbolKind(ds.Kind),
-		Signature: detail,
-		Receiver:  receiver,
-		Parent:    parent,
-		FilePath:  filePath,
-		Line:      int(ds.Range.Start.Line),
+		Name:        ds.Name,
+		Kind:        convertSymbolKind(ds.Kind),
+		PackagePath: packagePath,
+		Signature:   detail,
+		Receiver:    receiver,
+		Parent:      parent,
+		FilePath:    filePath,
+		Line:        int(ds.Range.Start.Line),
 		// Note: Doc and Body are set separately from AST in handleListPackageSymbols
 	}
 
