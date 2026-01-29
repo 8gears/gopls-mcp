@@ -122,7 +122,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenImplementation)
+		content := testutil.ResultText(t, res, testutil.GoldenImplementationInterface)
 		t.Logf("Interface implementations:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -215,7 +215,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenImplementation)
+		content := testutil.ResultText(t, res, testutil.GoldenImplementationInterfaceByType)
 		t.Logf("Interfaces implemented by type:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -307,7 +307,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenImplementation)
+		content := testutil.ResultText(t, res, testutil.GoldenImplementationMethod)
 		t.Logf("Method implementations:\n%s", content)
 
 		// Should find method implementations

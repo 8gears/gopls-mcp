@@ -1,7 +1,3 @@
-// Copyright 2025 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package golang
 
 import (
@@ -179,24 +175,24 @@ func ResolveNode(ctx context.Context, snapshot *cache.Snapshot, fh file.Handle, 
 //
 // Example - Find implementations of Writer interface:
 //
-//	    locator := api.SymbolLocator{
-//	        SymbolName:  "Write",
-//	        ParentScope: "Writer",  // interface name
-//	        Kind:        "method",
-//	        ContextFile: "/path/to/interfaces.go",
-//	    }
-//	    impls, err := golang.LLMImplementation(ctx, snapshot, locator)
-//	    // Returns: File, FileWriter, ConsoleWriter, etc.
+//	locator := api.SymbolLocator{
+//	    SymbolName:  "Write",
+//	    ParentScope: "Writer",  // interface name
+//	    Kind:        "method",
+//	    ContextFile: "/path/to/interfaces.go",
+//	}
+//	impls, err := golang.LLMImplementation(ctx, snapshot, locator)
+//	// Returns: File, FileWriter, ConsoleWriter, etc.
 //
 // Example - Find what interfaces a type implements:
 //
-//	    locator := api.SymbolLocator{
-//	        SymbolName:  "FileWriter",
-//	        Kind:        "struct",
-//	        ContextFile: "/path/to/file.go",
-//	    }
-//	    impls, err := golang.LLMImplementation(ctx, snapshot, locator)
-//	    // Returns: Writer, io.Closer, etc.
+//	locator := api.SymbolLocator{
+//	    SymbolName:  "FileWriter",
+//	    Kind:        "struct",
+//	    ContextFile: "/path/to/file.go",
+//	}
+//	impls, err := golang.LLMImplementation(ctx, snapshot, locator)
+//	// Returns: Writer, io.Closer, etc.
 //
 // This bypasses the LSP protocol layer and works directly with gopls internals,
 // making it faster and more accurate than text-based search.
@@ -311,15 +307,15 @@ func matchesLocatorFilters(locator api.SymbolLocator, nodeParent, nodeKind strin
 
 // candidateScore represents the score of a candidate for selection.
 type candidateScore struct {
-	candidate   *ResolveNodeResult
-	confidence  float64
+	candidate    *ResolveNodeResult
+	confidence   float64
 	isDefinition bool
 }
 
 // scoreCandidate calculates a score for a candidate based on the locator's preferences.
 func scoreCandidate(candidate ResolveNodeResult, pgf *parsego.File, locator api.SymbolLocator) candidateScore {
 	score := candidateScore{
-		candidate:   &candidate,
+		candidate:    &candidate,
 		isDefinition: candidate.IsDefinition,
 	}
 
@@ -367,6 +363,7 @@ func selectBestCandidate(current, new *ResolveNodeResult, pgf *parsego.File, loc
 //   - "fmt.Println" -> "fmt"
 //   - "pkg.subpkg.Symbol" -> "pkg"
 //   - "x.y.Symbol" -> "x"
+//
 // This handles nested selectors by recursively extracting the leftmost identifier.
 func extractSelector(expr ast.Expr) string {
 	switch expr := expr.(type) {
@@ -674,6 +671,8 @@ func buildSourceContext(fset *token.FileSet, obj types.Object, node ast.Node) So
 
 	// 5. Build signature using gopls's type formatter
 	signature := types.ObjectString(obj, nil) // nil = no qualifier needed
+	// Clean up verbose package paths in signatures for LLM readability
+	signature = cleanSignature(signature)
 
 	return SourceContext{
 		File:       position.Filename,
@@ -685,6 +684,98 @@ func buildSourceContext(fset *token.FileSet, obj types.Object, node ast.Node) So
 		Snippet:    snippet,
 		DocComment: docComment,
 	}
+}
+
+// cleanSignature removes verbose package paths from type signatures.
+// This makes signatures more readable and token-efficient for LLMs.
+//
+// Before: func (command-line-arguments/path/to/file/main.go.FileWriter).Write(data string) error
+// After:  func (FileWriter).Write(data string) error
+func cleanSignature(sig string) string {
+	// Remove package paths from receiver types
+	// Pattern: (package.path.to.file.Type) -> (Type)
+	// This handles both regular and command-line-arguments package prefixes
+
+	// First, handle receiver declarations like: func (pkg/path.Type)Method(...)
+	// We want to keep: func (Type)Method(...)
+
+	result := sig
+
+	// Match receiver patterns: (full.package.path.TypeName) or (*full.package.path.TypeName)
+	// and replace with just (TypeName) or (*TypeName)
+
+	// This regex finds patterns like:
+	// - (command-line-arguments/.../file.go.Type)
+	// - (example.com/pkg.Type)
+	// - (*example.com/pkg.Type)
+	// And extracts just the type name without the package path
+
+	// For now, use a simple heuristic: find the last ')' before the first '.' in the receiver
+	// and remove everything from '(' up to and including the last '/'
+
+	// Split by lines to handle multi-line signatures
+	lines := strings.Split(result, "\n")
+	for i, line := range lines {
+		// Look for receiver pattern at the start of the function declaration
+		if strings.HasPrefix(line, "func (") {
+			// Find the closing paren of the receiver
+			receiverEnd := strings.Index(line[5:], ")")
+			if receiverEnd == -1 {
+				continue
+			}
+			receiverEnd += 5 // Adjust for "func ("
+
+			// Extract the receiver declaration
+			receiver := line[5:receiverEnd]
+
+			// Clean up the receiver by removing package paths
+			cleanReceiver := cleanReceiverType(receiver)
+
+			// Reconstruct the line
+			lines[i] = "func " + cleanReceiver + line[receiverEnd+1:]
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// cleanReceiverType removes package paths from a receiver type declaration.
+// Examples:
+//   - "(command-line-arguments/path/file.go.FileWriter)" -> "(FileWriter)"
+//   - "(*example.com/pkg.Type)" -> "(*Type)"
+//   - "(Type)" -> "(Type)" (unchanged)
+func cleanReceiverType(receiver string) string {
+	// Check if there's a pointer
+	isPointer := strings.HasPrefix(receiver, "(*")
+	if isPointer {
+		receiver = receiver[2:] // Remove "(*"
+	} else if strings.HasPrefix(receiver, "(") {
+		receiver = receiver[1:] // Remove "("
+	}
+
+	// Find the last occurrence of path separators
+	// Common patterns: "pkg/path.Type" or "path/to/file.Type"
+	lastSlash := strings.LastIndex(receiver, "/")
+	lastDot := strings.LastIndex(receiver, ".")
+
+	// The type name should be after the last path separator
+	var typeName string
+	if lastSlash != -1 && lastDot > lastSlash {
+		typeName = receiver[lastDot+1:]
+	} else if lastSlash != -1 {
+		typeName = receiver[lastSlash+1:]
+	} else {
+		typeName = receiver
+	}
+
+	// Remove trailing paren if present
+	typeName = strings.TrimSuffix(typeName, ")")
+
+	// Reconstruct with pointer if needed
+	if isPointer {
+		return "(*" + typeName + ")"
+	}
+	return "(" + typeName + ")"
 }
 
 // getKindFromObject determines the kind of a types.Object.
@@ -1050,15 +1141,23 @@ func ResolveSymbol(ctx context.Context, snapshot *cache.Snapshot, locator api.Sy
 		if options.IncludeDefinition && len(locations) > 0 {
 			// Get the primary definition location
 			defLoc := locations[0]
-			srcCtx := sourceContextFromLocation(snapshot, defLoc)
 
-			// Enhance with object information
-			if result.Object != nil {
-				srcCtx.Signature = formatObjectString(result.Object)
-				srcCtx.Kind = getKindFromObject(result.Object)
+			// Find the AST node at the definition location (contains doc comment)
+			defNode := findNodeAtPos(pgf, defLoc.Range.Start.Line, defLoc.Range.Start.Character)
+
+			// Build rich source context if we have both object and node
+			if result.Object != nil && defNode != nil {
+				srcCtx := buildSourceContext(pkg.FileSet(), result.Object, defNode)
+				info.Definition = &srcCtx
+			} else {
+				// Fallback to minimal source context
+				srcCtx := sourceContextFromLocation(snapshot, defLoc)
+				if result.Object != nil {
+					srcCtx.Signature = formatObjectString(result.Object)
+					srcCtx.Kind = getKindFromObject(result.Object)
+				}
+				info.Definition = &srcCtx
 			}
-
-			info.Definition = &srcCtx
 		}
 	}
 
@@ -1499,4 +1598,206 @@ func GoDefinition(ctx context.Context, snapshot *cache.Snapshot, locator api.Sym
 	}
 
 	return info.Locations, nil
+}
+
+// ===== Symbol Information Extraction Utilities =====
+// These functions extract rich symbol information from gopls internal structures.
+
+// ExtractSymbolAtDefinition extracts symbol information (name, kind, signature, docs, body)
+// at the given definition location using the internal hover() function.
+//
+// This is a core utility for rich symbol extraction that bridges gopls internal APIs
+// with LLM-friendly output formats.
+//
+// By using the internal hover() function, we get clean documentation without
+// pkg.go.dev markdown links, and properly formatted signatures from gopls.
+func ExtractSymbolAtDefinition(ctx context.Context, snapshot *cache.Snapshot, loc protocol.Location, includeBody bool) *api.Symbol {
+	// Read the file at the definition location
+	fh, err := snapshot.ReadFile(ctx, loc.URI)
+	if err != nil {
+		return nil
+	}
+
+	// Use the start position from the location
+	rng := protocol.Range{
+		Start: loc.Range.Start,
+		End:   loc.Range.Start,
+	}
+
+	// Call the internal hover() function to get hoverResult with clean documentation
+	// This gives us access to the raw hoverResult before markdown conversion
+	_, h, err := hover(ctx, snapshot, fh, rng)
+	if err != nil || h == nil {
+		// If hover fails, return basic symbol info from location
+		return &api.Symbol{
+			Name:     "<symbol>",
+			FilePath: loc.URI.Path(),
+			Line:     int(loc.Range.Start.Line + 1),
+		}
+	}
+
+	// Extract clean documentation (no pkg.go.dev links!) and signature
+	documentation := h.FullDocumentation
+	signature := h.Signature
+
+	// Extract name, receiver, and kind from SymbolName and signature
+	// SymbolName format: "pkg.Name" for functions, "(pkg.Type).Method" for methods
+	name := "<symbol>"
+	kind := api.SymbolKindType
+	receiver := ""
+
+	if h.SymbolName != "" {
+		// Parse SymbolName to extract name and receiver
+		// Format: "pkg.FuncName" or "(pkg.Type).MethodName"
+		if strings.HasPrefix(h.SymbolName, "(") {
+			// Method: "(pkg.Type).MethodName"
+			// Extract receiver and name
+			parenEnd := strings.Index(h.SymbolName, ")")
+			if parenEnd != -1 {
+				// Receiver is between parentheses
+				receiverWithPkg := h.SymbolName[1:parenEnd]
+				// Remove package prefix from receiver
+				lastDot := strings.LastIndex(receiverWithPkg, ".")
+				if lastDot != -1 {
+					receiver = receiverWithPkg[lastDot+1:]
+				} else {
+					receiver = receiverWithPkg
+				}
+
+				// Method name is after ")."
+				dotAfterParen := strings.Index(h.SymbolName[parenEnd:], ".")
+				if dotAfterParen != -1 {
+					name = h.SymbolName[parenEnd+dotAfterParen+1:]
+					kind = api.SymbolKindMethod
+				}
+			}
+		} else {
+			// Function or variable: "pkg.Name"
+			// Extract just the name (after the last dot)
+			lastDot := strings.LastIndex(h.SymbolName, ".")
+			if lastDot != -1 {
+				name = h.SymbolName[lastDot+1:]
+			} else {
+				name = h.SymbolName
+			}
+		}
+	}
+
+	// If we couldn't parse SymbolName, fall back to parsing the signature
+	if name == "<symbol>" && signature != "" {
+		name, receiver, kind = parseSignatureForName(signature)
+	}
+
+	// Extract package path from LinkPath
+	packagePath := h.LinkPath
+	// LinkPath may include module version, strip it if present
+	// Format: "module@version/pkg/path" or just "pkg/path"
+	if atIndex := strings.Index(packagePath, "@"); atIndex != -1 {
+		slashAfterVersion := strings.Index(packagePath[atIndex:], "/")
+		if slashAfterVersion != -1 {
+			packagePath = packagePath[:atIndex] + packagePath[atIndex+slashAfterVersion:]
+		}
+	}
+
+	sym := &api.Symbol{
+		Name:        name,
+		Kind:        kind,
+		Signature:   signature,
+		Receiver:    receiver,
+		PackagePath: packagePath,
+		FilePath:    loc.URI.Path(),
+		Line:        int(loc.Range.Start.Line + 1),
+		Doc:         documentation,
+	}
+
+	// Extract function body if requested
+	if includeBody && kind == api.SymbolKindFunction {
+		body := ExtractBodyForSymbol(ctx, snapshot, name, loc.URI.Path())
+		sym.Body = body
+	}
+
+	return sym
+}
+
+// parseSignatureForName extracts name, receiver, and kind from a signature string.
+// This is a fallback when SymbolName parsing fails.
+func parseSignatureForName(signature string) (name, receiver string, kind api.SymbolKind) {
+	// Try to extract name from signature
+	// Common patterns: "func Name(...)", "func (recv) Name(...)", "type Name struct", "var Name ..."
+	sigLines := strings.Split(signature, "\n")
+	if len(sigLines) > 0 {
+		firstLine := sigLines[0]
+		parts := strings.Fields(firstLine)
+		if len(parts) >= 2 {
+			if parts[0] == "func" || parts[0] == "type" || parts[0] == "var" || parts[0] == "const" {
+				rawName := parts[1]
+				// Check if this is a method with receiver: "(Type)MethodName"
+				if strings.HasPrefix(rawName, "(") {
+					if idx := strings.Index(rawName, ")"); idx != -1 && idx+1 < len(rawName) {
+						receiver = strings.TrimSpace(rawName[1:idx])
+						name = rawName[idx+1:]
+						// Remove parameter list from method names
+						if idx := strings.Index(name, "("); idx != -1 {
+							name = name[:idx]
+						}
+						kind = api.SymbolKindMethod
+					}
+				} else {
+					name = rawName
+					// Remove parameter list from function names
+					if idx := strings.Index(name, "("); idx != -1 {
+						name = name[:idx]
+					}
+				}
+				// Set kind based on declaration
+				switch parts[0] {
+				case "func":
+					kind = api.SymbolKindFunction
+				case "type":
+					kind = api.SymbolKindType
+				case "var":
+					kind = api.SymbolKindVariable
+				case "const":
+					kind = api.SymbolKindConstant
+				}
+			}
+		}
+	}
+	return
+}
+
+// FormatSymbolSummary formats symbol information for display.
+// This produces a markdown-formatted summary suitable for LLM consumption.
+func FormatSymbolSummary(sym *api.Symbol) string {
+	if sym == nil {
+		return ""
+	}
+
+	var parts []string
+	if sym.Name != "" {
+		parts = append(parts, fmt.Sprintf("\n\n**Name**: `%s`", sym.Name))
+	} else {
+		// Ensure we always start with a blank line, even if Name is empty
+		parts = append(parts, "\n")
+	}
+	if sym.Kind != "" {
+		parts = append(parts, fmt.Sprintf("**Kind**: %s", sym.Kind))
+	}
+	if sym.Receiver != "" {
+		parts = append(parts, fmt.Sprintf("**Receiver**: `%s`", sym.Receiver))
+	}
+	if sym.Parent != "" {
+		parts = append(parts, fmt.Sprintf("**Parent**: `%s`", sym.Parent))
+	}
+	if sym.Signature != "" {
+		parts = append(parts, fmt.Sprintf("\n**Signature**\n%s", sym.Signature))
+	}
+	if sym.Doc != "" {
+		parts = append(parts, fmt.Sprintf("\n**Documentation**\n%s", sym.Doc))
+	}
+	if sym.Body != "" {
+		parts = append(parts, fmt.Sprintf("\n**Body**\n%s", sym.Body))
+	}
+
+	return strings.Join(parts, "\n")
 }

@@ -6,6 +6,7 @@ site/venv/
 # Copied documentation files (see gopls/mcpbridge/DOCS.md for originals)
 site/docs/
 
+gopls/gopls
 # Claude Code
 .claude/
 .env

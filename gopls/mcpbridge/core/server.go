@@ -87,7 +87,7 @@ var tools = []Tool{
 	GenericTool[api.ISymbolReferencesParams, *api.OSymbolReferencesResult]{
 		Name:        ToolGoSymbolReferences,
 		Description: "Find all usages of a symbol across the codebase using semantic location (symbol name, package, scope). Use this before refactoring to assess impact or to understand how a symbol is used. REPLACES: grep + manual file reading for finding references.",
-		Handler:     handleGoSymbolReferences, // uses semantic bridge (resolveSymbolLocatorToPosition)
+		Handler:     handleGoSymbolReferences, // uses semantic bridge (golang.ResolveNode)
 	},
 
 	GenericTool[api.IRenameSymbolParams, *api.ORenameSymbolResult]{

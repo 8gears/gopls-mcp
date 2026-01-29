@@ -25,45 +25,6 @@ import (
 //
 // Origin: gopls/internal/mcp/*.go handlers are wrapped here
 
-// resolveSymbolLocatorToPosition resolves a SymbolLocator to a protocol.Position
-// using the semantic bridge (golang.ResolveNode).
-//
-// DEPRECATED: This is being phased out in favor of functions in llm_bridge.go.
-// Currently used by handleGoSymbolReferences and handleGoCallHierarchy.
-// TODO: Remove once those handlers are migrated to llm_bridge.go functions.
-func resolveSymbolLocatorToPosition(ctx context.Context, snapshot *cache.Snapshot, locator api.SymbolLocator) (protocol.Position, error) {
-	// Read the context file
-	uri := protocol.URIFromPath(locator.ContextFile)
-	fh, err := snapshot.ReadFile(ctx, uri)
-	if err != nil {
-		return protocol.Position{}, fmt.Errorf("failed to read file %s: %w", locator.ContextFile, err)
-	}
-
-	// Use the semantic bridge to resolve the symbol
-	result, err := golang.ResolveNode(ctx, snapshot, fh, locator)
-	if err != nil {
-		return protocol.Position{}, err
-	}
-
-	// Get the package for the file to access the file set
-	pkg, _, err := golang.NarrowestPackageForFile(ctx, snapshot, uri)
-	if err != nil {
-		return protocol.Position{}, fmt.Errorf("failed to get package: %w", err)
-	}
-
-	// Convert token.Pos to protocol.Position
-	posn := safetoken.StartPosition(pkg.FileSet(), result.Pos)
-	if !posn.IsValid() {
-		return protocol.Position{}, fmt.Errorf("invalid position for symbol '%s'", locator.SymbolName)
-	}
-
-	// Convert to protocol.Position (0-indexed)
-	return protocol.Position{
-		Line:      uint32(posn.Line - 1),
-		Character: uint32(posn.Column - 1),
-	}, nil
-}
-
 // ===== get_package_symbol_detail =====
 // Origin: gopls/internal/mcp/outline.go outlineHandler()
 
@@ -622,31 +583,47 @@ func handleGoDefinition(ctx context.Context, h *Handler, req *mcp.CallToolReques
 	}
 	defer release()
 
-	// Call the semantic bridge to find definitions
-	locations, err := golang.GoDefinition(ctx, snapshot, input.Locator)
+	// Use the unified ResolveSymbol to get both locations and rich definition info
+	info, err := golang.ResolveSymbol(ctx, snapshot, input.Locator, golang.ResolveOptions{
+		FindDefinitions:    true,
+		IncludeDefinition:  true,
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve symbol '%s': %v", input.Locator.SymbolName, err)
 	}
 
-	if len(locations) == 0 {
+	if len(info.Locations) == 0 {
 		summary := fmt.Sprintf("No definition found for symbol '%s' in %s", input.Locator.SymbolName, input.Locator.ContextFile)
 		result := &api.ODefinitionResult{Summary: summary}
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}}, result, nil
 	}
 
-	// Return the first location (most common case)
-	loc := locations[0]
-
-	// Extract symbol information at the definition location
-	sym := extractSymbolAtDefinition(ctx, snapshot, loc, input.IncludeBody)
+	// Convert SourceContext to api.Symbol
+	var sym *api.Symbol
+	if info.Definition != nil {
+		srcCtx := info.Definition
+		sym = &api.Symbol{
+			Name:      srcCtx.Symbol,
+			Kind:      api.SymbolKind(srcCtx.Kind),
+			Signature: srcCtx.Signature,
+			Doc:       srcCtx.DocComment,
+			FilePath:  srcCtx.File,
+			Line:      srcCtx.StartLine,
+		}
+		// Include body (snippet) if requested
+		if input.IncludeBody {
+			sym.Body = srcCtx.Snippet
+		}
+	}
 
 	// Build summary
+	loc := info.Locations[0]
 	summary := fmt.Sprintf("Definition found at %s:%d", loc.URI.Path(), loc.Range.Start.Line+1)
-	if len(locations) > 1 {
-		summary += fmt.Sprintf("\n(%d additional location(s) available)", len(locations)-1)
+	if len(info.Locations) > 1 {
+		summary += fmt.Sprintf("\n(%d additional location(s) available)", len(info.Locations)-1)
 	}
 	if sym != nil {
-		summary += formatSymbolSummary(sym)
+		summary += golang.FormatSymbolSummary(sym)
 	}
 
 	result := &api.ODefinitionResult{
@@ -654,223 +631,6 @@ func handleGoDefinition(ctx context.Context, h *Handler, req *mcp.CallToolReques
 		Summary: summary,
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}}, result, nil
-}
-
-// cleanDocumentation filters out pkg.go.dev markdown links from documentation strings.
-// golang.Hover() returns docs with links like [`Func` on pkg.go.dev](https://pkg.go.dev/...)
-// which add clutter. This function removes those links, keeping only the actual docs.
-//
-// The go doc link is useless and give LLM wrong direction to retrieve Details
-// from network instead of relying on current MCP server to retrieve them.
-// Hence, we clean the possible link.
-func cleanDocumentation(docLines []string) string {
-	var cleaned []string
-	for _, line := range docLines {
-		trimmed := strings.TrimSpace(line)
-		// Skip pkg.go.dev markdown links
-		if strings.Contains(trimmed, "pkg.go.dev") || strings.Contains(trimmed, "[`") {
-			// Check if the line is primarily a pkg.go.dev link
-			if strings.HasPrefix(trimmed, "[`") && strings.Contains(trimmed, "](") {
-				continue // Skip this line entirely
-			}
-			// Try to clean the line by removing markdown links
-			cleanedLine := trimmed
-			// Remove markdown links like [`text`](url)
-			for {
-				start := strings.Index(cleanedLine, "[`")
-				if start == -1 {
-					break
-				}
-				end := strings.Index(cleanedLine[start:], "](")
-				if end == -1 {
-					break
-				}
-				end += start
-				linkEnd := strings.Index(cleanedLine[end:], ")")
-				if linkEnd == -1 {
-					break
-				}
-				linkEnd += end
-				// Extract the text between [` and `]
-				textStart := start + 2
-				textEnd := strings.Index(cleanedLine[textStart:], "`]")
-				if textEnd == -1 {
-					break
-				}
-				textEnd += textStart
-				text := cleanedLine[textStart:textEnd]
-				// Replace the markdown link with just the text
-				cleanedLine = cleanedLine[:start] + text + cleanedLine[linkEnd+1:]
-			}
-			if cleanedLine != "" {
-				cleaned = append(cleaned, cleanedLine)
-			}
-		} else if trimmed != "" {
-			cleaned = append(cleaned, trimmed)
-		}
-	}
-	return strings.Join(cleaned, "\n")
-}
-
-// extractSymbolAtDefinition extracts symbol information (name, kind, signature, docs, body)
-// at the given definition location using golang.Hover() and AST parsing.
-func extractSymbolAtDefinition(ctx context.Context, snapshot *cache.Snapshot, loc protocol.Location, includeBody bool) *api.Symbol {
-	// Read the file at the definition location
-	fh, err := snapshot.ReadFile(ctx, loc.URI)
-	if err != nil {
-		return nil
-	}
-
-	// Use the start position from the location
-	position := loc.Range.Start
-
-	// Get hover information to extract signature and documentation
-	hover, err := golang.Hover(ctx, snapshot, fh, protocol.Range{
-		Start: position,
-		End:   position,
-	}, nil)
-	if err != nil || hover == nil {
-		// If hover fails, return basic symbol info from location
-		return &api.Symbol{
-			Name:     "<symbol>",
-			FilePath: loc.URI.Path(),
-			Line:     int(loc.Range.Start.Line + 1),
-		}
-	}
-
-	// Parse hover content to extract signature, documentation, and type
-	content := hover.Contents.Value
-	var signature, documentation string
-
-	// Parse markdown format: code blocks for signature, rest for documentation
-	lines := strings.Split(content, "\n")
-	inCodeBlock := false
-	var codeLines []string
-	var docLines []string
-
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
-			if inCodeBlock {
-				inCodeBlock = false
-			} else {
-				inCodeBlock = true
-			}
-			continue
-		}
-		if inCodeBlock {
-			codeLines = append(codeLines, line)
-		} else {
-			line = strings.TrimSpace(line)
-			// Skip empty lines and common markdown separators
-			if line != "" && line != "---" && line != "***" && line != "___" {
-				docLines = append(docLines, line)
-			}
-		}
-	}
-
-	if len(codeLines) > 0 {
-		signature = strings.Join(codeLines, "\n")
-	}
-	documentation = cleanDocumentation(docLines)
-
-	// Extract name, receiver, and kind from signature
-	name := "<symbol>"
-	kind := api.SymbolKindType
-	receiver := ""
-	if signature != "" {
-		// Try to extract name from signature
-		// Common patterns: "func Name(...)", "func (recv) Name(...)", "type Name struct", "var Name ..."
-		sigLines := strings.Split(signature, "\n")
-		if len(sigLines) > 0 {
-			firstLine := sigLines[0]
-			parts := strings.Fields(firstLine)
-			if len(parts) >= 2 {
-				if parts[0] == "func" || parts[0] == "type" || parts[0] == "var" || parts[0] == "const" {
-					rawName := parts[1]
-					// Check if this is a method with receiver: "(Type)MethodName"
-					if strings.HasPrefix(rawName, "(") {
-						if idx := strings.Index(rawName, ")"); idx != -1 && idx+1 < len(rawName) {
-							receiver = strings.TrimSpace(rawName[1:idx])
-							name = rawName[idx+1:]
-							// Remove parameter list from method names
-							if idx := strings.Index(name, "("); idx != -1 {
-								name = name[:idx]
-							}
-							kind = api.SymbolKindMethod
-						}
-					} else {
-						name = rawName
-						// Remove parameter list from function names
-						if idx := strings.Index(name, "("); idx != -1 {
-							name = name[:idx]
-						}
-					}
-					// Set kind based on declaration
-					switch parts[0] {
-					case "func":
-						kind = api.SymbolKindFunction
-					case "type":
-						kind = api.SymbolKindType
-					case "var":
-						kind = api.SymbolKindVariable
-					case "const":
-						kind = api.SymbolKindConstant
-					}
-				}
-			}
-		}
-	}
-
-	sym := &api.Symbol{
-		Name:      name,
-		Kind:      kind,
-		Signature: signature,
-		Receiver:  receiver,
-		FilePath:  loc.URI.Path(),
-		Line:      int(loc.Range.Start.Line + 1),
-		Doc:       documentation,
-	}
-
-	// Extract function body if requested
-	if includeBody && kind == api.SymbolKindFunction {
-		body := golang.ExtractBodyForSymbol(ctx, snapshot, name, loc.URI.Path())
-		sym.Body = body
-	}
-
-	return sym
-}
-
-// formatSymbolSummary formats symbol information for the summary text.
-func formatSymbolSummary(sym *api.Symbol) string {
-	if sym == nil {
-		return ""
-	}
-
-	var parts []string
-	if sym.Name != "" {
-		parts = append(parts, fmt.Sprintf("\n\n**Name**: `%s`", sym.Name))
-	}
-	if sym.Kind != "" {
-		parts = append(parts, fmt.Sprintf("**Kind**: %s", sym.Kind))
-	}
-	if sym.Receiver != "" {
-		parts = append(parts, fmt.Sprintf("**Receiver**: `%s`", sym.Receiver))
-	}
-	if sym.Parent != "" {
-		parts = append(parts, fmt.Sprintf("**Parent**: `%s`", sym.Parent))
-	}
-	if sym.Signature != "" {
-		parts = append(parts, fmt.Sprintf("\n**Signature**\n```go\n%s\n```", sym.Signature))
-	}
-	if sym.Doc != "" {
-		parts = append(parts, fmt.Sprintf("\n**Documentation**\n%s", sym.Doc))
-	}
-	if sym.Body != "" {
-		parts = append(parts, fmt.Sprintf("\n**Body**\n%s", sym.Body))
-	}
-
-	return strings.Join(parts, "\n")
 }
 
 // ===== go_symbol_references =====
@@ -883,17 +643,34 @@ func handleGoSymbolReferences(ctx context.Context, h *Handler, req *mcp.CallTool
 	}
 	defer release()
 
-	// Resolve SymbolLocator to a file position using the semantic bridge
-	position, err := resolveSymbolLocatorToPosition(ctx, snapshot, input.Locator)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to resolve symbol '%s': %v", input.Locator.SymbolName, err)
-	}
-
-	// Read the file at the context position
+	// Read the context file
 	uri := protocol.URIFromPath(input.Locator.ContextFile)
 	fh, err := snapshot.ReadFile(ctx, uri)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read file %s: %v", input.Locator.ContextFile, err)
+	}
+
+	// Resolve the symbol using the semantic bridge
+	nodeResult, err := golang.ResolveNode(ctx, snapshot, fh, input.Locator)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve symbol '%s': %v", input.Locator.SymbolName, err)
+	}
+
+	// Get the package for the file to access the file set
+	pkg, _, err := golang.NarrowestPackageForFile(ctx, snapshot, uri)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get package: %w", err)
+	}
+
+	// Convert token.Pos to protocol.Position
+	posn := safetoken.StartPosition(pkg.FileSet(), nodeResult.Pos)
+	if !posn.IsValid() {
+		return nil, nil, fmt.Errorf("invalid position for symbol '%s'", input.Locator.SymbolName)
+	}
+
+	position := protocol.Position{
+		Line:      uint32(posn.Line - 1),
+		Character: uint32(posn.Column - 1),
 	}
 
 	// Call gopls's References function
@@ -908,7 +685,7 @@ func handleGoSymbolReferences(ctx context.Context, h *Handler, req *mcp.CallTool
 	var symbols []*api.Symbol
 	if defLocs, err := golang.Definition(ctx, snapshot, fh, position); err == nil && len(defLocs) > 0 {
 		// Extract symbol information at the definition location
-		if sym := extractSymbolAtDefinition(ctx, snapshot, defLocs[0], true); sym != nil {
+		if sym := golang.ExtractSymbolAtDefinition(ctx, snapshot, defLocs[0], true); sym != nil {
 			symbols = append(symbols, sym)
 		}
 	}
@@ -922,14 +699,33 @@ func handleGoSymbolReferences(ctx context.Context, h *Handler, req *mcp.CallTool
 		summary.WriteString(fmt.Sprintf("Found %d reference(s) to %q:\n",
 			len(locations), input.Locator.SymbolName))
 		for i, loc := range locations {
-			summary.WriteString(fmt.Sprintf("  %d. %s:%d:%d\n",
+			summary.WriteString(fmt.Sprintf("%d. %s:%d:%d",
 				i+1, loc.URI.Path(), loc.Range.Start.Line+1, loc.Range.Start.Character+1))
+
+			// Try to get context by reading the file at this location
+			fh, err := snapshot.ReadFile(ctx, loc.URI)
+			if err == nil {
+				// Get the line of code containing the reference
+				content, err := fh.Content()
+				if err == nil {
+					lines := strings.Split(string(content), "\n")
+					lineIdx := int(loc.Range.Start.Line)
+					if lineIdx >= 0 && lineIdx < len(lines) {
+						line := strings.TrimSpace(lines[lineIdx])
+						// Show the line of code for context
+						if len(line) > 0 && len(line) < 100 {
+							summary.WriteString(fmt.Sprintf("\n   %s", line))
+						}
+					}
+				}
+			}
+			summary.WriteString("\n")
 		}
-		// Add symbol details if available
+		// Add referenced symbol details if available
 		if len(symbols) > 0 {
 			sym := symbols[0]
 			if sym.Signature != "" {
-				summary.WriteString(fmt.Sprintf("\nSymbol: %s\n", sym.Signature))
+				summary.WriteString(fmt.Sprintf("\nReferenced Symbol: %s\n", sym.Signature))
 			}
 			if sym.Doc != "" {
 				summary.WriteString(fmt.Sprintf("Documentation: %s\n", sym.Doc))
@@ -1002,15 +798,19 @@ func handleGoImplementation(ctx context.Context, h *Handler, req *mcp.CallToolRe
 	symbols := make([]*api.Symbol, 0, len(sourceContexts))
 
 	for _, srcCtx := range sourceContexts {
-		symbols = append(symbols, &api.Symbol{
+		sym := &api.Symbol{
 			Name:      srcCtx.Symbol,
 			Kind:      api.SymbolKind(srcCtx.Kind),
 			Signature: srcCtx.Signature,
 			FilePath:  srcCtx.File,
 			Line:      srcCtx.StartLine,
 			Doc:       srcCtx.DocComment,
-			Body:      srcCtx.Snippet, // Snippet is the "HERO" field - full code
-		})
+		}
+		// Include body (snippet) if requested
+		if input.IncludeBody {
+			sym.Body = srcCtx.Snippet
+		}
+		symbols = append(symbols, sym)
 	}
 
 	// Build summary with rich information from SourceContext
@@ -1021,22 +821,11 @@ func handleGoImplementation(ctx context.Context, h *Handler, req *mcp.CallToolRe
 	} else {
 		summary = fmt.Sprintf("Found %d implementation(s) for symbol '%s':\n",
 			len(symbols), input.Locator.SymbolName)
-		for i, srcCtx := range sourceContexts {
-			locInfo := fmt.Sprintf("  %d. %s", i+1, srcCtx.Symbol)
-			if srcCtx.Signature != "" {
-				locInfo += fmt.Sprintf(" - %s", srcCtx.Signature)
-			}
-			// Show only line numbers (columns removed for cleaner output)
-			locInfo += fmt.Sprintf("\n     at %s:%d-%d",
-				srcCtx.File, srcCtx.StartLine, srcCtx.EndLine)
-			if srcCtx.DocComment != "" {
-				// Add first line of documentation
-				docLines := strings.Split(srcCtx.DocComment, "\n")
-				if len(docLines) > 0 {
-					locInfo += fmt.Sprintf("\n     %s", docLines[0])
-				}
-			}
-			summary += locInfo + "\n"
+		for i, sym := range symbols {
+			summary += fmt.Sprintf("%d. %s at %s:%d",
+				i+1, sym.Name, sym.FilePath, sym.Line)
+			summary += golang.FormatSymbolSummary(sym)
+			summary += "\n"
 		}
 	}
 
@@ -1453,17 +1242,34 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 		defer release()
 	}
 
-	// Resolve SymbolLocator to position using the semantic bridge
-	position, err := resolveSymbolLocatorToPosition(ctx, snapshot, input.Locator)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to resolve symbol '%s': %v", input.Locator.SymbolName, err)
-	}
-
-	// Read the file
+	// Read the context file
 	uri := protocol.URIFromPath(input.Locator.ContextFile)
 	fh, err := snapshot.ReadFile(ctx, uri)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read file: %v", err)
+	}
+
+	// Resolve the symbol using the semantic bridge
+	nodeResult, err := golang.ResolveNode(ctx, snapshot, fh, input.Locator)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve symbol '%s': %v", input.Locator.SymbolName, err)
+	}
+
+	// Get the package for the file to access the file set
+	pkg, _, err := golang.NarrowestPackageForFile(ctx, snapshot, uri)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get package: %w", err)
+	}
+
+	// Convert token.Pos to protocol.Position
+	posn := safetoken.StartPosition(pkg.FileSet(), nodeResult.Pos)
+	if !posn.IsValid() {
+		return nil, nil, fmt.Errorf("invalid position for symbol '%s'", input.Locator.SymbolName)
+	}
+
+	position := protocol.Position{
+		Line:      uint32(posn.Line - 1),
+		Character: uint32(posn.Column - 1),
 	}
 
 	// Determine direction (default to "both")
@@ -1499,7 +1305,7 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 		URI:   item.URI,
 		Range: item.Range,
 	}
-	richSymbol := extractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default for performance
+	richSymbol := golang.ExtractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default for performance
 
 	// Build the symbol - use rich info if available, otherwise fall back to basic info
 	symbol := api.Symbol{
@@ -1540,7 +1346,7 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 					URI:   call.From.URI,
 					Range: call.From.Range,
 				}
-				richSymbol := extractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default
+				richSymbol := golang.ExtractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default
 
 				// Extract package path for this symbol
 				pkgPath := ""
@@ -1599,7 +1405,7 @@ func handleGoCallHierarchy(ctx context.Context, h *Handler, req *mcp.CallToolReq
 					URI:   call.To.URI,
 					Range: call.To.Range,
 				}
-				richSymbol := extractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default
+				richSymbol := golang.ExtractSymbolAtDefinition(ctx, snapshot, loc, false) // Don't include body by default
 
 				// Extract package path for this symbol
 				pkgPath := ""

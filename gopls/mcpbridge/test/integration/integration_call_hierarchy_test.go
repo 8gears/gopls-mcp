@@ -27,6 +27,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 				"line_hint":    5,
 			},
 			"direction": "both",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -70,6 +71,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 				"line_hint":    10,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -105,6 +107,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 				"line_hint":    5,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -134,6 +137,7 @@ func TestGetCallHierarchy_BasicFunctionality(t *testing.T) {
 				"line_hint":    5,
 			},
 			// No direction specified
+			"Cwd": projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -169,6 +173,7 @@ func TestGetCallHierarchy_ComplexCallGraph(t *testing.T) {
 				"line_hint":    16,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -202,6 +207,7 @@ func TestGetCallHierarchy_ComplexCallGraph(t *testing.T) {
 				"line_hint":    7,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -234,6 +240,7 @@ func TestGetCallHierarchy_ErrorHandling(t *testing.T) {
 				"line_hint":    1,
 			},
 			"direction": "both",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -262,6 +269,7 @@ func TestGetCallHierarchy_ErrorHandling(t *testing.T) {
 				"line_hint":    1,
 			},
 			"direction": "both",
+			"Cwd":       projectDir,
 		}
 
 		_, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -287,6 +295,7 @@ func TestGetCallHierarchy_OutputFormat(t *testing.T) {
 				"line_hint":    5,
 			},
 			"direction": "both",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -441,6 +450,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 				"line_hint":    9,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -470,6 +480,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 				"line_hint":    14,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -499,6 +510,7 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 				"line_hint":    18,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -529,17 +541,6 @@ func TestGetCallHierarchy_StructMethods(t *testing.T) {
 func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 	t.Run("CrossFileCalls", func(t *testing.T) {
 		projectDir := createMultiFileProject(t)
-
-		// Force gopls to analyze the project first
-		_, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "go_build_check",
-			Arguments: map[string]any{
-				"Cwd": projectDir,
-			},
-		})
-		if err != nil {
-			t.Logf("Warning: diagnostics call failed: %v", err)
-		}
 
 		// Check outgoing calls from main (in main.go) to functions in helpers.go
 		tool := "go_get_call_hierarchy"
@@ -573,17 +574,6 @@ func TestGetCallHierarchy_MultipleFiles(t *testing.T) {
 
 	t.Run("CrossPackageCalls", func(t *testing.T) {
 		projectDir := createMultiPackageProject(t)
-
-		// Force gopls to analyze the project first
-		_, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{
-			Name: "go_build_check",
-			Arguments: map[string]any{
-				"Cwd": projectDir,
-			},
-		})
-		if err != nil {
-			t.Logf("Warning: diagnostics call failed: %v", err)
-		}
 
 		// Check calls from main package to another package
 		tool := "go_get_call_hierarchy"
@@ -631,6 +621,7 @@ func TestGetCallHierarchy_MultipleCallSites(t *testing.T) {
 				"line_hint":    15,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -666,6 +657,7 @@ func TestGetCallHierarchy_MultipleCallSites(t *testing.T) {
 				"line_hint":    19,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -704,6 +696,7 @@ func TestGetCallHierarchy_StdlibCalls(t *testing.T) {
 				"line_hint":    10,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -739,6 +732,7 @@ func TestGetCallHierarchy_InterfaceMethods(t *testing.T) {
 				"line_hint":    11,
 			},
 			"direction": "incoming",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -770,6 +764,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 				"line_hint":    8,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -799,6 +794,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 				"line_hint":    7,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})
@@ -828,6 +824,7 @@ func TestGetCallHierarchy_SpecialCases(t *testing.T) {
 				"line_hint":    3,
 			},
 			"direction": "outgoing",
+			"Cwd":       projectDir,
 		}
 
 		res, err := globalSession.CallTool(globalCtx, &mcp.CallToolParams{Name: tool, Arguments: args})

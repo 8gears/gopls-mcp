@@ -81,7 +81,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferences)
+		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferencesExactCount)
 		t.Logf("Symbol references:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -195,7 +195,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferences)
+		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferencesCrossFile)
 		t.Logf("Cross-file references:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -275,7 +275,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferences)
+		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferencesNoReferences)
 		t.Logf("Unused symbol references:\n%s", content)
 
 		// === STRONG ASSERTIONS ===
@@ -354,7 +354,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferences)
+		content := testutil.ResultText(t, res, testutil.GoldenSymbolReferencesType)
 		t.Logf("Type references:\n%s", content)
 
 		// === STRONG ASSERTIONS ===

@@ -29,7 +29,7 @@ func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
 			t.Fatalf("Failed to run diagnostics on e2e files: %v", err)
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesDiagnostics)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnosticsTests)
 		t.Logf("E2E test file diagnostics:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should successfully analyze and return diagnostic information
@@ -52,7 +52,7 @@ func TestRealTestFiles_DiagnosticsOnTests(t *testing.T) {
 			t.Fatalf("Failed to run diagnostics on integration files: %v", err)
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesDiagnostics)
+		content := testutil.ResultText(t, res, testutil.GoldenDiagnosticsTests)
 		t.Logf("Integration test file diagnostics:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should successfully analyze integration test files
@@ -77,7 +77,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Fatalf("Failed to search for test functions: %v", err)
 		}
 
-		resultContent := testutil.ResultText(t, res, testutil.GoldenRealTestFilesNavigate)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTests)
 		t.Logf("Test function search:\n%s", resultContent)
 
 		// Should find our test functions
@@ -145,7 +145,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Fatalf("Failed to call go_definition: %v", err)
 		}
 
-		resultContent := testutil.ResultText(t, res, testutil.GoldenRealTestFilesNavigate)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTests)
 		t.Logf("Test function definition:\n%s", resultContent)
 
 		// Should find the definition (it's in the same file)
@@ -173,7 +173,7 @@ func TestRealTestFiles_TestPackageSymbols(t *testing.T) {
 			t.Fatalf("Failed to list testutil symbols: %v", err)
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesPackageSymbols)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsTestFiles)
 		t.Logf("Testutil package symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find utility functions
@@ -200,7 +200,7 @@ func TestRealTestFiles_TestPackageSymbols(t *testing.T) {
 			t.Fatalf("Failed to list benchmark symbols: %v", err)
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenRealTestFilesPackageSymbols)
+		content := testutil.ResultText(t, res, testutil.GoldenListPackageSymbolsTestFiles)
 		t.Logf("Benchmark package symbols:\n%s", testutil.TruncateString(content, 2000))
 
 		// Should find benchmark-related symbols
@@ -247,7 +247,7 @@ func TestRealTestFiles_FindTestUsages(t *testing.T) {
 			t.Fatalf("Failed to find references: %v", err)
 		}
 
-		references := testutil.ResultText(t, res2, testutil.GoldenRealTestFilesFindTestUsages)
+		references := testutil.ResultText(t, res2, testutil.GoldenSymbolReferencesTests)
 		t.Logf("AssertStringContains references:\n%s", testutil.TruncateString(references, 2000))
 
 		// Should find usages across test files
@@ -268,7 +268,7 @@ func TestRealTestFiles_FindTestUsages(t *testing.T) {
 			t.Fatalf("Failed to search for globalSession: %v", err)
 		}
 
-		resultContent := testutil.ResultText(t, res, testutil.GoldenRealTestFilesFindTestUsages)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTests)
 		t.Logf("Search for globalSession across codebase:\n%s", testutil.TruncateString(resultContent, 2000))
 
 		// Should find usages in test files

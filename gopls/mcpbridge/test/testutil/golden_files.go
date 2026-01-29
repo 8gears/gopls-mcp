@@ -5,7 +5,7 @@ package testutil
 //
 // Naming convention:
 // - MCP tool tests: <mcp_tool>_<case>.golden (e.g., go_definition_e2e_strong.golden)
-// - Corner cases (non-MCP-tool tests): workflow_<description>.golden
+// - Corner cases (non-MCP-tool tests): etc<description>.golden
 //
 // To add a new golden file:
 // 1. Add it to the appropriate group below
@@ -21,16 +21,36 @@ const (
 	GoldenListModulePackages              = "go_list_module_packages_e2e.golden"
 	GoldenListPackageSymbols              = "go_list_package_symbols_e2e.golden"
 	GoldenListPackageSymbolsComprehensive = "go_list_package_symbols_e2e_comprehensive.golden"
+	GoldenListPackageSymbolsTestFiles     = "go_list_package_symbols_test_files_e2e.golden"
 	GoldenListTools                       = "go_list_tools_e2e.golden"
 	GoldenAnalyzeWorkspace                = "go_analyze_workspace_e2e.golden"
 	GoldenGetPackageSymbolDetail          = "go_get_package_symbol_detail_e2e.golden"
 	GoldenGetStarted                      = "go_get_started_e2e.golden"
 
 	// Navigation Tools (go_definition, go_implementation, go_symbol_references)
-	GoldenDefinition          = "go_definition_e2e_strong.golden"
-	GoldenDefinitionCrossFile = "go_definition_cross_file_strong.golden"
-	GoldenImplementation      = "go_implementation_e2e.golden"
-	GoldenSymbolReferences    = "go_symbol_references_strong.golden"
+	// go_definition - basic functionality
+	GoldenDefinitionExactLocation    = "go_definition_exact_location.golden"
+	GoldenDefinitionTypeDefinition   = "go_definition_type_definition.golden"
+	GoldenDefinitionMethodDefinition = "go_definition_method_definition.golden"
+	GoldenDefinitionImportStatement  = "go_definition_import_statement.golden"
+	GoldenDefinitionInvalidPosition  = "go_definition_invalid_position.golden"
+	GoldenDefinitionNoSymbol         = "go_definition_no_symbol.golden"
+	// go_definition - cross-file
+	GoldenDefinitionCrossFileFunction = "go_definition_cross_file_function.golden"
+	GoldenDefinitionCrossFileType     = "go_definition_cross_file_type.golden"
+	GoldenDefinitionCrossFileMethod   = "go_definition_cross_file_method.golden"
+
+	// go_implementation
+	GoldenImplementationInterface       = "go_implementation_interface.golden"
+	GoldenImplementationInterfaceByType = "go_implementation_interface_by_type.golden"
+	GoldenImplementationMethod          = "go_implementation_method.golden"
+
+	// go_symbol_references
+	GoldenSymbolReferencesExactCount   = "go_symbol_references_exact_count.golden"
+	GoldenSymbolReferencesCrossFile    = "go_symbol_references_cross_file.golden"
+	GoldenSymbolReferencesNoReferences = "go_symbol_references_no_references.golden"
+	GoldenSymbolReferencesType         = "go_symbol_references_type.golden"
+	GoldenSymbolReferencesTests        = "go_symbol_references_test_files_e2e.golden"
 
 	// Call Hierarchy Tool (go_get_call_hierarchy)
 	// Note: Each subtest has its own golden file to avoid overwrites
@@ -66,7 +86,8 @@ const (
 	GoldenDependencyGraphTransitive   = "go_get_dependency_graph_transitive_dependencies.golden"
 
 	// Diagnostics Tool (go_build_check)
-	GoldenDiagnostics = "go_build_check_e2e.golden"
+	GoldenDiagnostics      = "go_build_check_e2e.golden"
+	GoldenDiagnosticsTests = "go_build_check_test_files_e2e.golden"
 
 	// Read File Tool (go_read_file)
 	GoldenReadFile = "go_read_file_e2e.golden"
@@ -74,91 +95,91 @@ const (
 	// Rename Symbol Tool (go_dryrun_rename_symbol)
 	GoldenRenameSymbolStrong = "go_dryrun_rename_symbol_strong.golden"
 
+	// Search Tool (go_search)
+	GoldenSearch      = "go_search_e2e.golden"
+	GoldenSearchTests = "go_search_test_files_e2e.golden"
+
 	// ===== Corner Cases & Special Scenarios =====
 	// These tests don't directly correspond to a single MCP tool
 	// They test specific language features, workflows, or edge cases
 
-	// Generics Support
-	GoldenGenericsSupport           = "workflow_generics_support.golden"
-	GoldenGenericsBasicFunctions    = "workflow_generics_basic_functions.golden"
-	GoldenGenericsConstraints       = "workflow_generics_constraints.golden"
-	GoldenGenericsGenericInterfaces = "workflow_generics_generic_interfaces.golden"
-	GoldenGenericsGenericTypes      = "workflow_generics_generic_types.golden"
-	GoldenGenericsNestedGenerics    = "workflow_generics_nested_generics.golden"
-	GoldenGenericsRealWorldUsage    = "workflow_generics_real_world_usage.golden"
-	GoldenGenericsTypeInference     = "workflow_generics_type_inference.golden"
-	GoldenInterfaceSatisfaction     = "workflow_interface_satisfaction.golden"
+	// Generics Support (cross-cutting tests for all tools with generics)
+	GoldenGenericsSupport           = "etc_generics_support.golden"
+	GoldenGenericsBasicFunctions    = "etc_generics_basic_functions.golden"
+	GoldenGenericsConstraints       = "etc_generics_constraints.golden"
+	GoldenGenericsGenericInterfaces = "etc_generics_generic_interfaces.golden"
+	GoldenGenericsGenericTypes      = "etc_generics_generic_types.golden"
+	GoldenGenericsNestedGenerics    = "etc_generics_nested_generics.golden"
+	GoldenGenericsRealWorldUsage    = "etc_generics_real_world_usage.golden"
+	GoldenGenericsTypeInference     = "etc_generics_type_inference.golden"
+	GoldenInterfaceSatisfaction     = "etc_interface_satisfaction.golden"
 
-	// Refactoring Scenarios
-	GoldenRefactoringSafeRename          = "workflow_refactoring_safe_rename.golden"
-	GoldenRefactoringSafeDelete          = "workflow_refactoring_safe_delete.golden"
-	GoldenRefactoringExtractFunction     = "workflow_refactoring_extract_function.golden"
-	GoldenRefactoringInlineFunction      = "workflow_refactoring_inline_function.golden"
-	GoldenRefactoringMoveSymbol          = "workflow_refactoring_move_symbol.golden"
-	GoldenRefactoringChangeSignature     = "workflow_refactoring_change_signature.golden"
-	GoldenRefactoringInterfaceExtraction = "workflow_refactoring_interface_extraction.golden"
-	GoldenRefactoringMultiFileChange     = "workflow_refactoring_multi_file_change.golden"
-	GoldenRefactoringRealWorldScenario   = "workflow_refactoring_real_world_scenario.golden"
-	GoldenRenameEdgeCases                = "workflow_rename_edge_cases.golden"
-	GoldenComplexRenameScenarios         = "workflow_complex_rename_scenarios.golden"
+	// Refactoring Scenarios (multi-tool refactoring workflows)
+	GoldenRefactoringSafeRename          = "etc_refactoring_safe_rename.golden"
+	GoldenRefactoringSafeDelete          = "etc_refactoring_safe_delete.golden"
+	GoldenRefactoringExtractFunction     = "etc_refactoring_extract_function.golden"
+	GoldenRefactoringInlineFunction      = "etc_refactoring_inline_function.golden"
+	GoldenRefactoringMoveSymbol          = "etc_refactoring_move_symbol.golden"
+	GoldenRefactoringChangeSignature     = "etc_refactoring_change_signature.golden"
+	GoldenRefactoringInterfaceExtraction = "etc_refactoring_interface_extraction.golden"
+	GoldenRefactoringMultiFileChange     = "etc_refactoring_multi_file_change.golden"
+	GoldenRefactoringRealWorldScenario   = "etc_refactoring_real_world_scenario.golden"
+	GoldenRenameEdgeCases                = "etc_rename_edge_cases.golden"
+	GoldenComplexRenameScenarios         = "etc_complex_rename_scenarios.golden"
 
 	// Performance Tests
-	GoldenPerformanceAnalyzeWorkspace       = "workflow_performance_analyze_workspace.golden"
-	GoldenPerformanceBatchOperations        = "workflow_performance_batch_operations.golden"
-	GoldenPerformanceCallHierarchy          = "workflow_performance_call_hierarchy.golden"
-	GoldenPerformanceDiagnosticsIncremental = "workflow_performance_diagnostics_incremental.golden"
-	GoldenPerformanceLargeFiles             = "workflow_performance_large_files.golden"
-	GoldenPerformanceLargeTestFile          = "workflow_performance_large_test_file.golden"
+	GoldenPerformanceAnalyzeWorkspace       = "etc_performance_analyze_workspace.golden"
+	GoldenPerformanceBatchOperations        = "etc_performance_batch_operations.golden"
+	GoldenPerformanceCallHierarchy          = "etc_performance_call_hierarchy.golden"
+	GoldenPerformanceDiagnosticsIncremental = "etc_performance_diagnostics_incremental.golden"
+	GoldenPerformanceLargeFiles             = "etc_performance_large_files.golden"
+	GoldenPerformanceLargeTestFile          = "etc_performance_large_test_file.golden"
 
 	// Comprehensive Workflows (All Tools)
-	GoldenAllTools           = "workflow_e2e_all_tools.golden"
-	GoldenRealCodebase       = "workflow_e2e_real_codebase.golden"
-	GoldenRealCodebaseRename = "workflow_e2e_refactoring.golden"
+	GoldenAllTools           = "etc_e2e_all_tools.golden"
+	GoldenRealCodebase       = "etc_e2e_real_codebase.golden"
+	GoldenRealCodebaseRename = "etc_e2e_refactoring.golden"
 
 	// Real-World Workflow Tests
-	GoldenWorkflowCrossModule    = "workflow_real_workflow_cross_module_analysis.golden"
-	GoldenWorkflowDiagnostics    = "workflow_real_workflow_diagnostics_and_quality.golden"
-	GoldenWorkflowErrorScenarios = "workflow_real_workflow_error_scenarios.golden"
-	GoldenWorkflowMultiPackage   = "workflow_real_workflow_multi_package_analysis.golden"
-	GoldenWorkflowPerformance    = "workflow_real_workflow_performance.golden"
-	GoldenWorkflowRefactoring    = "workflow_real_workflow_refactoring_scenarios.golden"
-	GoldenWorkflowToolChaining   = "workflow_real_workflow_tool_chain_chaining_multiple_tools.golden"
-	GoldenWorkflowUnderstandArch = "workflow_real_workflow_understand_architecture.golden"
+	GoldenWorkflowCrossModule    = "etc_real_cross_module_analysis.golden"
+	GoldenWorkflowDiagnostics    = "etc_real_diagnostics_and_quality.golden"
+	GoldenWorkflowErrorScenarios = "etc_real_error_scenarios.golden"
+	GoldenWorkflowMultiPackage   = "etc_real_multi_package_analysis.golden"
+	GoldenWorkflowPerformance    = "etc_real_performance.golden"
+	GoldenWorkflowRefactoring    = "etc_real_refactoring_scenarios.golden"
+	GoldenWorkflowToolChaining   = "etc_real_tool_chain_chaining_multiple_tools.golden"
+	GoldenWorkflowUnderstandArch = "etc_real_understand_architecture.golden"
 
 	// Real Test Files
-	GoldenRealTestFilesDiagnostics       = "workflow_real_test_files_diagnostics_on_tests.golden"
-	GoldenRealTestFilesFindTestUsages    = "workflow_real_test_files_find_test_usages.golden"
-	GoldenRealTestFilesNavigate          = "workflow_real_test_files_navigate_test_code.golden"
-	GoldenRealTestFilesPackageSymbols    = "workflow_real_test_files_test_package_symbols.golden"
-	GoldenRealTestFilesWorkspaceAnalysis = "workflow_real_test_files_workspace_analysis.golden"
+	GoldenRealTestFilesWorkspaceAnalysis = "etc_real_test_files_workspace_analysis.golden"
 
 	// Error Scenarios
-	GoldenErrorScenarios = "workflow_e2e_error_scenarios.golden"
-	GoldenErrorHandling  = "workflow_error_handling_e2e.golden"
-	GoldenAddNegative    = "workflow_add_negative.golden"
-	GoldenSomething      = "workflow_something.golden"
-	GoldenMain           = "workflow_main.golden"
+	GoldenErrorScenarios = "etc_e2e_error_scenarios.golden"
+	GoldenErrorHandling  = "etc_error_handling_e2e.golden"
+	GoldenAddNegative    = "etc_add_negative.golden"
+	GoldenSomething      = "etc_something.golden"
+	GoldenMain           = "etc_main.golden"
 
 	// File Watching
-	GoldenFileWatching = "workflow_file_watching_e2e.golden"
+	GoldenFileWatching = "etc_file_watching_e2e.golden"
 
 	// Empty CWD
-	GoldenEmptyCWD = "workflow_empty_cwd_e2e.golden"
+	GoldenEmptyCWD = "etc_empty_cwd_e2e.golden"
 
 	// Cache Behavior
-	GoldenCacheWarmedOnStartup = "workflow_cache_is_warmed_on_startup.golden"
-	GoldenCacheWarmupRace      = "workflow_cache_warmup_race_condition.golden"
+	GoldenCacheWarmedOnStartup = "etc_cache_is_warmed_on_startup.golden"
+	GoldenCacheWarmupRace      = "etc_cache_warmup_race_condition.golden"
 
 	// Stdlib Deep Dive Tests
-	GoldenStdlibComplexTypes = "workflow_stdlib_complex_types.golden"
-	GoldenStdlibNavigation   = "workflow_stdlib_navigation.golden"
-	GoldenStdlibReferences   = "workflow_stdlib_references.golden"
-	GoldenStdlibContext      = "workflow_stdlib_context_deep_dive.golden"
-	GoldenStdlibDatabaseSQL  = "workflow_stdlib_database_sql_deep_dive.golden"
-	GoldenStdlibEncodingJSON = "workflow_stdlib_encoding_json_deep_dive.golden"
-	GoldenStdlibInterfaces   = "workflow_stdlib_interfaces.golden"
-	GoldenStdlibIO           = "workflow_stdlib_io_deep_dive.golden"
-	GoldenStdlibNetHTTP      = "workflow_stdlib_net_http_deep_dive.golden"
-	GoldenStdlibSync         = "workflow_stdlib_sync_deep_dive.golden"
-	GoldenStdlibTime         = "workflow_stdlib_time_deep_dive.golden"
+	GoldenStdlibComplexTypes = "etc_stdlib_complex_types.golden"
+	GoldenStdlibNavigation   = "etc_stdlib_navigation.golden"
+	GoldenStdlibReferences   = "etc_stdlib_references.golden"
+	GoldenStdlibContext      = "etc_stdlib_context_deep_dive.golden"
+	GoldenStdlibDatabaseSQL  = "etc_stdlib_database_sql_deep_dive.golden"
+	GoldenStdlibEncodingJSON = "etc_stdlib_encoding_json_deep_dive.golden"
+	GoldenStdlibInterfaces   = "etc_stdlib_interfaces.golden"
+	GoldenStdlibIO           = "etc_stdlib_io_deep_dive.golden"
+	GoldenStdlibNetHTTP      = "etc_stdlib_net_http_deep_dive.golden"
+	GoldenStdlibSync         = "etc_stdlib_sync_deep_dive.golden"
+	GoldenStdlibTime         = "etc_stdlib_time_deep_dive.golden"
 )

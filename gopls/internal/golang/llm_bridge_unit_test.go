@@ -1,7 +1,3 @@
-// Copyright 2025 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package golang
 
 import (
@@ -15,10 +11,10 @@ import (
 // TestUpdateScopeStack tests the scope stack update logic
 func TestUpdateScopeStack(t *testing.T) {
 	tests := []struct {
-		name           string
-		node           ast.Node
-		initialStack   []scopeFrame
-		wantEnclosing  string
+		name          string
+		node          ast.Node
+		initialStack  []scopeFrame
+		wantEnclosing string
 	}{
 		{
 			name: "function declaration without receiver",
@@ -58,7 +54,7 @@ func TestUpdateScopeStack(t *testing.T) {
 			node: &ast.FuncDecl{
 				Name: &ast.Ident{Name: "inner"},
 			},
-			initialStack:  []scopeFrame{
+			initialStack: []scopeFrame{
 				{enclosingFunc: "outer"},
 			},
 			wantEnclosing: "inner",
@@ -79,12 +75,12 @@ func TestUpdateScopeStack(t *testing.T) {
 // TestMatchesLocatorFilters tests the filter matching logic
 func TestMatchesLocatorFilters(t *testing.T) {
 	tests := []struct {
-		name        string
-		locator     api.SymbolLocator
-		nodeParent  string
-		nodeKind    string
-		wantPassed  bool
-		wantReason  string // if !wantPassed, the reason should match this prefix
+		name       string
+		locator    api.SymbolLocator
+		nodeParent string
+		nodeKind   string
+		wantPassed bool
+		wantReason string // if !wantPassed, the reason should match this prefix
 	}{
 		{
 			name:       "no filters - always passes",
@@ -94,64 +90,64 @@ func TestMatchesLocatorFilters(t *testing.T) {
 			wantPassed: true,
 		},
 		{
-			name:        "parent scope exact match",
-			locator:     api.SymbolLocator{SymbolName: "Func", ParentScope: "Server"},
-			nodeParent:  "Server",
-			nodeKind:    "function",
-			wantPassed:  true,
+			name:       "parent scope exact match",
+			locator:    api.SymbolLocator{SymbolName: "Func", ParentScope: "Server"},
+			nodeParent: "Server",
+			nodeKind:   "function",
+			wantPassed: true,
 		},
 		{
-			name:        "parent scope with pointer normalization",
-			locator:     api.SymbolLocator{SymbolName: "Func", ParentScope: "*Server"},
-			nodeParent:  "Server",
-			nodeKind:    "function",
-			wantPassed:  true,
+			name:       "parent scope with pointer normalization",
+			locator:    api.SymbolLocator{SymbolName: "Func", ParentScope: "*Server"},
+			nodeParent: "Server",
+			nodeKind:   "function",
+			wantPassed: true,
 		},
 		{
-			name:        "parent scope mismatch",
-			locator:     api.SymbolLocator{SymbolName: "Func", ParentScope: "Client"},
-			nodeParent:  "Server",
-			nodeKind:    "function",
-			wantPassed:  false,
-			wantReason:  "parent scope mismatch",
+			name:       "parent scope mismatch",
+			locator:    api.SymbolLocator{SymbolName: "Func", ParentScope: "Client"},
+			nodeParent: "Server",
+			nodeKind:   "function",
+			wantPassed: false,
+			wantReason: "parent scope mismatch",
 		},
 		{
-			name:        "parent scope substring false positive",
-			locator:     api.SymbolLocator{SymbolName: "Func", ParentScope: "Server"},
-			nodeParent:  "ServerType",
-			nodeKind:    "function",
-			wantPassed:  false,
-			wantReason:  "parent scope mismatch",
+			name:       "parent scope substring false positive",
+			locator:    api.SymbolLocator{SymbolName: "Func", ParentScope: "Server"},
+			nodeParent: "ServerType",
+			nodeKind:   "function",
+			wantPassed: false,
+			wantReason: "parent scope mismatch",
 		},
 		{
-			name:        "kind filter passes",
-			locator:     api.SymbolLocator{SymbolName: "Func", Kind: "function"},
-			nodeParent:  "Server",
-			nodeKind:    "function",
-			wantPassed:  true,
+			name:       "kind filter passes",
+			locator:    api.SymbolLocator{SymbolName: "Func", Kind: "function"},
+			nodeParent: "Server",
+			nodeKind:   "function",
+			wantPassed: true,
 		},
 		{
-			name:        "kind filter mismatch (struct vs function)",
-			locator:     api.SymbolLocator{SymbolName: "Func", Kind: "struct"},
-			nodeParent:  "Server",
-			nodeKind:    "function",
-			wantPassed:  false,
-			wantReason:  "kind mismatch",
+			name:       "kind filter mismatch (struct vs function)",
+			locator:    api.SymbolLocator{SymbolName: "Func", Kind: "struct"},
+			nodeParent: "Server",
+			nodeKind:   "function",
+			wantPassed: false,
+			wantReason: "kind mismatch",
 		},
 		{
-			name:        "both filters pass",
-			locator:     api.SymbolLocator{SymbolName: "Func", ParentScope: "*Server", Kind: "method"},
-			nodeParent:  "Server",
-			nodeKind:    "method",
-			wantPassed:  true,
+			name:       "both filters pass",
+			locator:    api.SymbolLocator{SymbolName: "Func", ParentScope: "*Server", Kind: "method"},
+			nodeParent: "Server",
+			nodeKind:   "method",
+			wantPassed: true,
 		},
 		{
-			name:        "parent filter fails, kind passes",
-			locator:     api.SymbolLocator{SymbolName: "Func", ParentScope: "Client", Kind: "method"},
-			nodeParent:  "Server",
-			nodeKind:    "method",
-			wantPassed:  false,
-			wantReason:  "parent scope mismatch",
+			name:       "parent filter fails, kind passes",
+			locator:    api.SymbolLocator{SymbolName: "Func", ParentScope: "Client", Kind: "method"},
+			nodeParent: "Server",
+			nodeKind:   "method",
+			wantPassed: false,
+			wantReason: "parent scope mismatch",
 		},
 	}
 

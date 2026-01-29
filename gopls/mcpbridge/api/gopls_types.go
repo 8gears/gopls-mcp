@@ -175,6 +175,10 @@ type IImplementationParams struct {
 	// This uses semantic information (symbol name, context file, package, scope)
 	// instead of error-prone line/column numbers.
 	Locator SymbolLocator `json:"locator" jsonschema:"semantic symbol locator (symbol_name, context_file, package_name, parent_scope, kind, line_hint)"`
+	// IncludeBody indicates whether to include the function body in the returned Symbols.
+	// When false (default), only signature and documentation are returned.
+	// When true, the function body implementation is also included.
+	IncludeBody bool `json:"include_body,omitempty" jsonschema:"whether to include function bodies in the returned Symbols (default: false)"`
 }
 
 // OImplementationResult is the output for go_implementation tool.

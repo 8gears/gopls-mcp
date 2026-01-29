@@ -43,7 +43,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionExactLocation)
 		t.Logf("Definition result:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -101,7 +101,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionTypeDefinition)
 		t.Logf("Definition result for Person type:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -142,7 +142,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionMethodDefinition)
 		t.Logf("Definition result for Greeting method:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -184,7 +184,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionImportStatement)
 		t.Logf("Definition result for fmt import:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -226,7 +226,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionInvalidPosition)
 		t.Logf("Result for invalid symbol:\n%s", content)
 
 		// STRONG ASSERTION: Must NOT claim to find a definition
@@ -263,7 +263,7 @@ func TestGoDefinitionE2E_Strong(t *testing.T) {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinition)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionNoSymbol)
 		t.Logf("Result for non-existent symbol:\n%s", content)
 
 		// STRONG ASSERTION: Should NOT claim to find a definition
@@ -348,7 +348,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFile)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFileFunction)
 		t.Logf("Cross-file definition result:\n%s", content)
 
 		// Compare against golden file (documentation + regression check)
@@ -393,7 +393,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFile)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFileType)
 		t.Logf("Cross-file type definition result:\n%s", content)
 
 		// CRITICAL ASSERTION: Must find the type definition in util.go
@@ -427,7 +427,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFile)
+		content := testutil.ResultText(t, res, testutil.GoldenDefinitionCrossFileMethod)
 		t.Logf("Cross-file method definition result:\n%s", content)
 
 		// CRITICAL ASSERTION: Must find the method definition in util.go
