@@ -1,5 +1,5 @@
 ---
-// src/components/mcp/GoDiagnostics.astro
+// src/components/mcp/GoCallHierarchy.astro
 import McpStyles from './McpStyles.astro';
 ---
 
@@ -8,10 +8,13 @@ import McpStyles from './McpStyles.astro';
 <div class="mcp-terminal-container">
   <div class="mcp-title-bar">
     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      <rect x="3" y="3" width="7" height="7"></rect>
+      <rect x="14" y="3" width="7" height="7"></rect>
+      <rect x="14" y="14" width="7" height="7"></rect>
+      <path d="M10 6.5h4"></path>
+      <path d="M17.5 10v4"></path>
     </svg>
-    <span>go_build_check</span>
+    <span>go_get_call_hierarchy</span>
   </div>
 
   <div class="editor-window">
@@ -20,10 +23,10 @@ import McpStyles from './McpStyles.astro';
         <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
         <span class="file-name">main.go</span>
       </div>
-      <span class="editor-pos">Ln 4</span>
+      <span class="editor-pos">Ln 5</span>
     </div>
     <div class="editor-body">
-      <div class="line"><span class="line-num">4</span>   x := <span class="val-num">42</span> <span class="cmt">// unused</span></div>
+      <div class="line"><span class="line-num">5</span>   <span class="kwd">func</span> <span class="highlight-trigger">main</span>() {'{'}</div>
     </div>
   </div>
 
@@ -36,16 +39,18 @@ import McpStyles from './McpStyles.astro';
     <div class="trace-item request">
       <div class="trace-direction">>> OUT (Request)</div>
       <div class="trace-content">
-        <span class="key">call_tool:</span> <span class="val-str">go_build_check</span>
+        <span class="key">call_tool:</span> <span class="val-str">go_get_call_hierarchy</span><br/>
+        <span class="key">locator:</span> {'{'} <span class="key">symbol_name:</span> <span class="val-str">"main"</span> {'}'}, <span class="key">direction:</span> <span class="val-str">"outgoing"</span>
       </div>
     </div>
 
     <div class="trace-item response">
       <div class="trace-direction"><< IN (Response)</div>
       <div class="trace-content">
-        <span class="key">diagnostics:</span> [<br/>
+        <span class="key">outgoing_calls:</span> [<br/>
         <div class="json-indent">
-          {'{'} <span class="key">file:</span> <span class="val-str">"main.go:4"</span>, <span class="key">"message:</span> <span class="val-str">"declared and not used: x"</span> {'}'}
+          <span class="val-str">"helperA() @ main.go:10"</span>,<br/>
+          <span class="val-str">"helperB() @ main.go:14"</span>
         </div>
         ]
       </div>

@@ -174,13 +174,34 @@ func RegisterTools(server *mcp.Server, handler *Handler) {
 // This is called by generate.go via go:generate and by tests for validation.
 // It always writes the full documentation from scratch.
 func GenerateReference(w io.Writer) error {
-	// Write header and section
-
+	// Write header and preamble
 	fmt.Fprintf(w, `---
 title: Reference
 sidebar:
   order: 1
 ---
+
+## About These Tools
+
+The gopls-mcp server provides **semantic analysis tools** powered by gopls (the Go language server).
+These tools are type-aware, fast, and token-efficient compared to text-based alternatives like grep.
+
+### Why Use Semantic Tools?
+
+| Approach | Problem | Solution |
+|----------|---------|----------|
+| grep/ripgrep | Text matching, no semantic understanding | Semantic tools understand types, scopes, and interfaces |
+| Manual file reading | High token cost, attention dilution | Targeted queries return only what you need |
+| go build | Slow code generation | Incremental type checking (~500x faster) |
+
+### Key Concepts
+
+- **Symbol Locator**: Most tools use symbol_name + context_file to identify symbols semantically
+- **JSON Schema**: Each tool's input schema is available via the MCP protocol (not duplicated here)
+- **Tool Relationships**: Tools cross-reference each other - see "See also" sections
+
+---
+
 `)
 
 	// Write each tool as a ### title with description
@@ -192,6 +213,103 @@ sidebar:
 	}
 
 	return nil
+}
+
+// GenerateCLAUDEToolReference generates a concise tool reference for CLAUDE.md.
+// This is a more compact format focusing on "what tool for what goal".
+func GenerateCLAUDEToolReference() (string, error) {
+	var buf strings.Builder
+
+	// Group tools by category
+	discovery := []string{"go_get_started", "go_analyze_workspace", "go_list_modules", "go_list_module_packages", "go_list_package_symbols", "go_search"}
+	reading := []string{"go_definition", "go_symbol_references", "go_implementation", "go_read_file", "go_get_package_symbol_detail", "go_get_call_hierarchy"}
+	analysis := []string{"go_get_dependency_graph", "go_dryrun_rename_symbol"}
+	verification := []string{"go_build_check"}
+	meta := []string{"go_list_tools"}
+
+	buf.WriteString("### Discovery & Navigation\n\n")
+	for _, name := range discovery {
+		writeToolEntry(&buf, name)
+	}
+
+	buf.WriteString("### Reading & Understanding\n\n")
+	for _, name := range reading {
+		writeToolEntry(&buf, name)
+	}
+
+	buf.WriteString("### Analysis & Refactoring\n\n")
+	for _, name := range analysis {
+		writeToolEntry(&buf, name)
+	}
+
+	buf.WriteString("### Verification\n\n")
+	for _, name := range verification {
+		writeToolEntry(&buf, name)
+	}
+
+	buf.WriteString("### Meta\n\n")
+	for _, name := range meta {
+		writeToolEntry(&buf, name)
+	}
+
+	return buf.String(), nil
+}
+
+// writeToolEntry writes a single tool entry in CLAUDE.md format
+func writeToolEntry(buf *strings.Builder, toolName string) {
+	// Find the tool
+	var targetTool Tool
+	for _, tool := range tools {
+		name, _ := tool.Details()
+		if name == toolName {
+			targetTool = tool
+			break
+		}
+	}
+
+	if targetTool == nil {
+		return // Tool not found, skip
+	}
+
+	name, description := targetTool.Details()
+	docs := targetTool.Docs()
+
+	// Format: **tool_name**: one-line description
+	// Extract first line from description as one-liner
+	lines := strings.Split(description, ".")
+	if len(lines) > 0 {
+		oneLiner := strings.TrimSpace(lines[0])
+		if !strings.HasSuffix(oneLiner, ".") {
+			oneLiner += "."
+		}
+		fmt.Fprintf(buf, "- **%s**: %s\n", name, oneLiner)
+	}
+
+	// Add "See also" cross-references if they exist in docs
+	if strings.Contains(docs, "**See also**") {
+		// Extract see also section
+		idx := strings.Index(docs, "**See also**")
+		if idx != -1 {
+			seeAlso := docs[idx:]
+			// Keep it concise - just the tool names
+			lines = strings.Split(seeAlso, "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "*") {
+					// Extract tool name from markdown
+					if idx := strings.Index(line, "`"); idx != -1 {
+						endIdx := strings.Index(line[idx+1:], "`")
+						if endIdx != -1 {
+							toolRef := line[idx+1 : idx+1+endIdx]
+							fmt.Fprintf(buf, "  - See: `%s`\n", toolRef)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	buf.WriteString("\n")
 }
 
 // UpdateReference updates the reference.md with the current tool list.

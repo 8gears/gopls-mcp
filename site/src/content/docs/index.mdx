@@ -71,12 +71,10 @@ hero:
       variant: secondary
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-import McpTerminal from '../../components/McpTerminal.astro';
-import GoSymbolReferences from '../../components/mcp/GoSymbolReferences.astro';
-import ListPackageSymbols from '../../components/mcp/ListPackageSymbols.astro';
-import GetPackageSymbolDetail from '../../components/mcp/GetPackageSymbolDetail.astro';
 import GoDiagnostics from '../../components/mcp/GoDiagnostics.astro';
+import GoDefinition from '../../components/mcp/GoDefinition.astro';
+import GoReferences from '../../components/mcp/GoReferences.astro';
+import GoCallHierarchy from '../../components/mcp/GoCallHierarchy.astro';
 
 <style>{`
   /* CSS for fine-tuning Hero area */
@@ -96,14 +94,31 @@ import GoDiagnostics from '../../components/mcp/GoDiagnostics.astro';
   :global([data-theme='light']) .hero html { color: #24292e; }
 `}</style>
 
-### Instant Exploration
-<ListPackageSymbols />
 
-### Semantic Context
-<GetPackageSymbolDetail />
+### MCP Provides Accurate Context to LLM
 
-### Precise Navigation
-<GoSymbolReferences />
+<style>{`
+  .mcp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: stretch;
+  }
+  .mcp-grid > * {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+`}</style>
 
-### Real-time Feedback
-<GoDiagnostics />
+<div class="mcp-grid">
+  <GoDiagnostics />
+  <GoReferences />
+</div>
+
+
+<div class="mcp-grid">
+  <GoDefinition />
+  <GoCallHierarchy />
+</div>

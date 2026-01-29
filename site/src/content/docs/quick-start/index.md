@@ -8,9 +8,25 @@ sidebar:
 
 ## Installation
 
+### Option 1: Install Script (Recommended)
+
+**Linux / macOS:**
+```bash
+curl -sSL https://gopls-mcp.org/install.sh | bash
 ```
+
+**Windows (PowerShell):**
+```powershell
+irm https://gopls-mcp.org/install.ps1 | iex
+```
+
+### Option 2: Go Install
+
+```bash
 go install gopls-mcp.org/gopls-mcp@latest
 ```
+
+> **Note:** The install script automatically detects your OS and architecture, downloads the latest release from GitHub, and installs the binary to `$GOPATH/bin` (typically `~/go/bin`).
 
 ---
 

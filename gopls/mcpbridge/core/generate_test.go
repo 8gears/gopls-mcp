@@ -3,7 +3,13 @@ package core
 import (
 	"bytes"
 	"os"
+	"strings"
 	"testing"
+)
+
+const (
+	autoGenStartMarker = "<!-- Marker: AUTO-GEN-START -->"
+	autoGenEndMarker   = "<!-- Marker: AUTO-GEN-END -->"
 )
 
 // TestGenerate ensures that the generated reference.md is up to date.
@@ -32,4 +38,82 @@ func TestGenerate(t *testing.T) {
 	}
 
 	t.Logf("reference.md is up to date with %d tools", len(tools))
+}
+
+// TestGenerateCLAUDEToolReference ensures that the CLAUDE.md tool reference generator works.
+func TestGenerateCLAUDEToolReference(t *testing.T) {
+	content, err := GenerateCLAUDEToolReference()
+	if err != nil {
+		t.Fatalf("GenerateCLAUDEToolReference failed: %v", err)
+	}
+
+	// Check that content is not empty
+	if content == "" {
+		t.Fatal("Generated content is empty")
+	}
+
+	// Check that it contains expected sections
+	expectedSections := []string{
+		"### Discovery & Navigation",
+		"### Reading & Understanding",
+		"### Analysis & Refactoring",
+		"### Verification",
+		"### Meta",
+	}
+
+	for _, section := range expectedSections {
+		if !strings.Contains(content, section) {
+			t.Errorf("Generated content missing section: %s", section)
+		}
+	}
+
+	// Check that it references some known tools
+	knownTools := []string{
+		"go_search",
+		"go_definition",
+		"go_build_check",
+	}
+
+	for _, tool := range knownTools {
+		if !strings.Contains(content, tool) {
+			t.Errorf("Generated content missing tool: %s", tool)
+		}
+	}
+
+	t.Logf("CLAUDE.md tool reference generated successfully (%d bytes)", len(content))
+}
+
+// TestCLAUDEMDMarkers ensures that CLAUDE.md has the auto-generation markers.
+func TestCLAUDEMDMarkers(t *testing.T) {
+	claudePath := "../../CLAUDE.md"
+	content, err := os.ReadFile(claudePath)
+	if err != nil {
+		t.Fatalf("Failed to read CLAUDE.md: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check for start marker
+	if !strings.Contains(contentStr, autoGenStartMarker) {
+		t.Error("CLAUDE.md missing start marker: " + autoGenStartMarker)
+	}
+
+	// Check for end marker
+	if !strings.Contains(contentStr, autoGenEndMarker) {
+		t.Error("CLAUDE.md missing end marker: " + autoGenEndMarker)
+	}
+
+	// Check that start appears before end
+	startIdx := strings.Index(contentStr, autoGenStartMarker)
+	endIdx := strings.Index(contentStr, autoGenEndMarker)
+
+	if startIdx == -1 || endIdx == -1 {
+		return // Already reported above
+	}
+
+	if startIdx >= endIdx {
+		t.Error("Start marker appears after end marker in CLAUDE.md")
+	}
+
+	t.Log("CLAUDE.md markers are present and in correct order")
 }

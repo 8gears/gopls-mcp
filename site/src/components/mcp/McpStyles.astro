@@ -1,0 +1,189 @@
+---
+// Shared styles for all MCP demo components
+---
+
+<style is:global>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --mcp-font-sans: 'Inter', -apple-system, system-ui, sans-serif;
+    --mcp-font-mono: 'JetBrains Mono', monospace;
+    --mcp-bg: #ffffff;
+    --mcp-border: #e5e7eb;
+    --mcp-shadow: 0 4px 12px rgba(0,0,0,0.06);
+
+    /* Code Colors */
+    --c-kwd: #cf222e;
+    --c-typ: #0550ae;
+    --c-str: #116329;
+    --c-num: #953800;
+    --c-cmt: #6e7781;
+    --c-key: #57606a;
+  }
+
+  /* Fixed container size for all components */
+  .mcp-terminal-container {
+    font-family: var(--mcp-font-sans);
+    background: var(--mcp-bg);
+    border: 1px solid var(--mcp-border);
+    border-radius: 12px;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--mcp-shadow);
+  }
+
+  /* Component title bar (inside the container) */
+  .mcp-title-bar {
+    padding: 0.6rem 0.75rem;
+    background: #f9fafb;
+    border-bottom: 1px solid var(--mcp-border);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .mcp-title-bar .icon {
+    width: 14px;
+    height: 14px;
+    color: #6b7280;
+  }
+
+  /* Editor Style */
+  .editor-window {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f3f4f6;
+    flex-shrink: 0;
+  }
+
+  .editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    color: #9ca3af;
+    font-size: 0.7rem;
+    font-weight: 500;
+  }
+
+  .file-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .file-icon {
+    width: 12px;
+    height: 12px;
+    color: #d1d5db;
+  }
+
+  .editor-body {
+    font-family: var(--mcp-font-mono);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .line-num {
+    color: #e5e7eb;
+    margin-right: 0.75rem;
+    user-select: none;
+  }
+
+  .kwd { color: var(--c-kwd); }
+  .typ { color: var(--c-typ); }
+  .cmt { color: var(--c-cmt); }
+
+  /* Trace Style */
+  .protocol-trace {
+    background: #fafbfc;
+    padding: 0.75rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .trace-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0.6rem;
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+
+  .trace-icon {
+    width: 12px;
+    height: 12px;
+    fill: #f59e0b;
+    stroke: none;
+  }
+
+  .trace-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .trace-direction {
+    font-weight: 700;
+    font-size: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .request .trace-direction { color: #2563eb; }
+  .response .trace-direction { color: #059669; }
+
+  .trace-content {
+    font-family: var(--mcp-font-mono);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: #4b5563;
+  }
+
+  .trace-item {
+    flex-shrink: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .trace-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .json-indent {
+    padding-left: 0.75rem;
+    border-left: 1px solid #e5e7eb;
+    margin-left: 2px;
+  }
+
+  .key { color: var(--c-key); }
+  .val-str { color: var(--c-str); }
+  .val-num { color: var(--c-num); }
+  .val-bool { color: #8b5cf6; }
+
+  /* Highlight styles */
+  .highlight-error {
+    border-bottom: 2px wavy #ef4444;
+    color: #dc2626;
+    font-weight: 500;
+  }
+
+  .highlight-trigger {
+    border: 1.5px dashed #22c55e;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: #f0fdf4;
+    color: #166534;
+    font-weight: 500;
+  }
+
+  .str {
+    color: var(--c-str);
+  }
+</style>
