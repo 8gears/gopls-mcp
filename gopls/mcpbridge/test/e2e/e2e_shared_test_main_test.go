@@ -19,7 +19,7 @@ import (
 // Global shared MCP session for all tests in the e2e package.
 // All test functions across all files should use globalSession and globalCtx.
 //
-// TEST-ONLY: The -allow-dynamic-views flag is enabled for performance optimization.
+// TEST-ONLY: The GOPMCS_ALLOW_DYNAMIC_VIEWS environment variable is enabled for performance optimization.
 // This allows one gopls-mcp process to create views for multiple test directories on-demand.
 var globalSession *mcp.ClientSession
 var globalCtx context.Context
@@ -31,13 +31,13 @@ var globalGoplsMcpDir string
 // TestMain sets up the shared MCP server before running any tests in the e2e package.
 // This function runs ONCE for the entire e2e test package, not per test file.
 //
-// The -allow-dynamic-views flag enables TEST-ONLY dynamic view creation:
+// The GOPMCS_ALLOW_DYNAMIC_VIEWS environment variable enables TEST-ONLY dynamic view creation:
 // - Starts ONE gopls-mcp process for ALL tests (not one per test)
 // - Shares the gopls cache (GOROOT, stdlib) across all tests
 // - Each test gets its own view created on first access via Cwd parameter
 // - Reduces test time from ~210s to ~60-70s
 //
-// IMPORTANT: This is for TESTING ONLY. Normal users should NOT use this flag.
+// IMPORTANT: This is for TESTING ONLY. Normal users should NOT use this.
 func TestMain(m *testing.M) {
 	// Build gopls-mcp first (outside of test context)
 	// NOTE: The main package is at the project root (4 levels up), not in gopls/
@@ -89,10 +89,8 @@ func TestMain(m *testing.M) {
 func startSharedServer(goplsMcpPath, sharedWorkdir string) (*mcp.ClientSession, context.Context, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v0.0.1"}, nil)
-	goplsMcpCmd := exec.Command(goplsMcpPath,
-		"-workdir", sharedWorkdir,
-		"-allow-dynamic-views", // TEST-ONLY: Enable dynamic view creation
-	)
+	goplsMcpCmd := exec.Command(goplsMcpPath, "-workdir", sharedWorkdir)
+	goplsMcpCmd.Env = append(os.Environ(), "GOPMCS_ALLOW_DYNAMIC_VIEWS=true") // TEST-ONLY: Enable dynamic view creation
 
 	mcpSession, err := client.Connect(ctx, &mcp.CommandTransport{Command: goplsMcpCmd}, nil)
 	if err != nil {

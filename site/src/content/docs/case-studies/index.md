@@ -8,7 +8,7 @@ Real-world examples of using gopls-mcp to improve AI-assisted Go development.
 
 ---
 
-## Coming Soon
+### Coming Soon
 
 Case studies showing how gopls-mcp improves AI workflows are being prepared.
 
@@ -20,6 +20,6 @@ Topics will include:
 
 ---
 
-## Want to Contribute?
+### Want to Contribute?
 
 If you have a case study to share, please submit a pull request!

@@ -25,8 +25,8 @@ import (
 // Handler implements gopls-mcp MCP tools using gopls's existing APIs.
 // This bridges the MCP tool requests to gopls's session, snapshot, and analysis capabilities.
 type Handler struct {
-	session   *cache.Session
-	lspServer protocol.Server
+	session *cache.Session
+	symbler Symbler
 	// options holds the gopls configuration options used for creating views.
 	options *settings.Options
 	// config holds the gopls-mcp configuration (response limits, etc.)
@@ -72,6 +72,10 @@ func WithDynamicViews(allow bool) HandlerOption {
 	}
 }
 
+type Symbler interface {
+	Symbol(ctx context.Context, params *protocol.WorkspaceSymbolParams) ([]protocol.SymbolInformation, error)
+}
+
 // NewHandler creates a new Handler backed by gopls's session and LSP server.
 // Based on: gopls/internal/mcp/mcp.go handler struct (line 31-34)
 //
@@ -79,10 +83,10 @@ func WithDynamicViews(allow bool) HandlerOption {
 // lazy loading, where packages are loaded on-demand when tool handlers
 // call methods like WorkspaceMetadata(), LoadMetadataGraph(), etc.
 // These methods internally call awaitLoaded() which triggers reloadWorkspace().
-func NewHandler(session *cache.Session, lspServer protocol.Server, opts ...HandlerOption) *Handler {
+func NewHandler(session *cache.Session, symbler Symbler, opts ...HandlerOption) *Handler {
 	h := &Handler{
 		session:           session,
-		lspServer:         lspServer,
+		symbler:           symbler,
 		options:           settings.DefaultOptions(), // Default gopls options
 		config:            DefaultConfig(),           // Default gopls-mcp config
 		allowDynamicViews: false,                     // Production mode: no dynamic views

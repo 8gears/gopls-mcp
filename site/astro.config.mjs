@@ -7,6 +7,7 @@ export default defineConfig({
 		starlight({
 			title: 'gopls-mcp',
 			description: 'Semantic Go code understanding for AI assistants',
+			pagination: false,
 			social: [
 				{ label: 'GitHub', href: 'https://github.com/xieyuschen/gopls-mcp', icon: 'github' }
 			],

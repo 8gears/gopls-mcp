@@ -17,7 +17,7 @@ import (
 
 // Watcher watches for file changes and notifies the gopls LSP server.
 type Watcher struct {
-	server   protocol.Server // LSP server to notify of file changes
+	server   ChangeWatchedFiles // LSP server to notify of file changes
 	fw       *filewatcher.Watcher
 	dir      string
 	stopCh   chan struct{}
@@ -27,6 +27,10 @@ type Watcher struct {
 	eventQueue []protocol.FileEvent
 	eventMu    sync.Mutex
 	eventReady chan struct{}
+}
+
+type ChangeWatchedFiles interface {
+	DidChangeWatchedFiles(context.Context, *protocol.DidChangeWatchedFilesParams) error
 }
 
 // New creates a new file watcher for the given directory.
@@ -40,7 +44,7 @@ type Watcher struct {
 //
 // The server parameter should implement protocol.ServerDidChangeWatchedFiles to handle
 // file change notifications and invalidate the gopls cache appropriately.
-func New(server protocol.Server, dir string) (*Watcher, error) {
+func New(server ChangeWatchedFiles, dir string) (*Watcher, error) {
 	w := &Watcher{
 		server:     server,
 		dir:        dir,

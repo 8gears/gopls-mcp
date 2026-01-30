@@ -491,7 +491,7 @@ func handleGoSearch(ctx context.Context, h *Handler, req *mcp.CallToolRequest, i
 	}
 
 	// Use LSP server's Symbol method (searches all views)
-	syms, err := h.lspServer.Symbol(ctx, &protocol.WorkspaceSymbolParams{
+	syms, err := h.symbler.Symbol(ctx, &protocol.WorkspaceSymbolParams{
 		Query: input.Query,
 	})
 	if err != nil {
@@ -585,8 +585,8 @@ func handleGoDefinition(ctx context.Context, h *Handler, req *mcp.CallToolReques
 
 	// Use the unified ResolveSymbol to get both locations and rich definition info
 	info, err := golang.ResolveSymbol(ctx, snapshot, input.Locator, golang.ResolveOptions{
-		FindDefinitions:    true,
-		IncludeDefinition:  true,
+		FindDefinitions:   true,
+		IncludeDefinition: true,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve symbol '%s': %v", input.Locator.SymbolName, err)

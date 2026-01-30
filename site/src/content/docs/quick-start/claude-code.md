@@ -8,9 +8,9 @@ Configure gopls-mcp with Claude Code.
 
 ---
 
-## Step 1: Build or Install gopls-mcp
+### Setup gopls-mcp for Your Project
 
-Ensure [claude code]() is installed, and run command below to add mcp server into claude code.
+Ensure [claude code](https://code.claude.com/docs/en/overview) is installed, and run command below to add mcp server into claude code.
 
 ```bash
 claude mcp add gopls-mcp -- gopls-mcp
@@ -26,7 +26,17 @@ File modified: /home/xieyuschen/.claude.json
 
 ---
 
-## Step 2: Verify Installation
+### Configure Project Instructions (CLAUDE.md)
+
+Claude needs specific instructions to know when to use the semantic tools. Run this command in your project root to add the rules (safe for both new and existing projects):
+
+```bash
+# Downloads and appends the instructions to CLAUDE.md
+# (Creates the file if it doesn't exist; preserves content if it does)
+curl -sL [https://gopls-mcp.org/CLAUDE.md](https://gopls-mcp.org/CLAUDE.md) >> CLAUDE.md
+```
+
+### Verify gopls-mcp
 
 Inside claude code, run `/mcp` command to verify `gopls-mcp` is availble.
 
@@ -48,8 +58,3 @@ If the tool is successfully added, you will see similiar output below:
 ```
 
 ---
-
-## Next Steps
-
-- [**Available Tools**](tools.md) - Learn about all 15 MCP tools
-- [**Tool Reference**](../reference/index.md) - Detailed tool documentation

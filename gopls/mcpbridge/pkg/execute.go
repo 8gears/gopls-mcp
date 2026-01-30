@@ -13,8 +13,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/tools/gopls/internal/cache"
-	"golang.org/x/tools/gopls/internal/file"
-	"golang.org/x/tools/gopls/internal/golang"
 	"golang.org/x/tools/gopls/internal/protocol"
 	"golang.org/x/tools/gopls/internal/settings"
 	"golang.org/x/tools/gopls/mcpbridge/core"
@@ -24,11 +22,28 @@ import (
 const (
 	// mcpName is the name of the MCP server.
 	mcpName = "gopls-mcp"
-	// mcpVersion is the version of the MCP server.
-	mcpVersion = "v0.0.1"
 )
 
+func init() {
+	flag.Usage = func() {
+		fmt.Fprint(os.Stderr,
+			`gopls-mcp - semantic code analysis designed for code agent.
+
+See docs: https://gopls-mcp.org
+
+Options:
+`)
+		flag.PrintDefaults()
+	}
+}
+
 var (
+	// version is the version of the binary (set by main.go).
+	version = "dev"
+	// showVersion requests printing the version and exiting.
+	showVersion = flag.Bool("version", false, "Print version information and exit")
+	// showHelp requests printing help information and exiting.
+	showHelp = flag.Bool("help", false, "Print help information and exit")
 	// addr is the address to listen on (enables HTTP mode).
 	addr = flag.String("addr", "", "Address to listen on (e.g., localhost:8080)")
 	// verbose enables verbose logging.
@@ -40,17 +55,20 @@ var (
 	// logfile is the path to a log file for debugging (optional).
 	// When set, logs are written to this file even in stdio mode.
 	logfile = flag.String("logfile", "", "Path to log file for debugging (writes logs even in stdio mode)")
-	// allowDynamicViews enables dynamic view creation for testing purposes only.
-	// TEST-ONLY FLAG: This allows the handler to create new gopls views on-demand
-	// when a Cwd parameter doesn't match any existing view.
-	// WARNING: This is intended for e2e testing only. Normal users should not
-	// need this flag, as they typically work with a single project.
+)
+
+const (
+	// allowDynamicViewsEnv is the environment variable name for enabling dynamic view creation.
+	// TEST-ONLY: This allows the handler to create new gopls views on-demand when a Cwd parameter
+	// doesn't match any existing view.
+	// WARNING: This is intended for e2e testing only. Normal users should not need this,
+	// as they typically work with a single project.
 	// Production usage: Run one gopls-mcp instance per project directory.
-	allowDynamicViews = flag.Bool("allow-dynamic-views", false, "TEST-ONLY: Allow dynamic view creation for multiple workdirs (e2e testing)")
+	allowDynamicViewsEnv = "GOPMCS_ALLOW_DYNAMIC_VIEWS"
 )
 
 func Execute() {
-	flag.Parse()
+	helpAndUsage()
 
 	// Configure logging based on transport mode
 	// CRITICAL: In stdio mode, NEVER log to stdout/stderr as it corrupts MCP protocol
@@ -170,17 +188,18 @@ func Execute() {
 	}
 
 	// Create gopls-mcp handler backed by gopls session
-	// Pass the allowDynamicViews flag to enable test-only dynamic view creation
 	// Pass the config to enable response limits
 	var handlerOpts []core.HandlerOption
 	handlerOpts = append(handlerOpts, core.WithConfig(config))
-	if *allowDynamicViews {
+	// Check environment variable for dynamic view creation (test-only)
+	if os.Getenv(allowDynamicViewsEnv) == "true" || os.Getenv(allowDynamicViewsEnv) == "1" {
+		log.Printf("[gopls-mcp] Dynamic views enabled via %s (TEST-ONLY)", allowDynamicViewsEnv)
 		handlerOpts = append(handlerOpts, core.WithDynamicViews(true))
 	}
 	coreHandler := core.NewHandler(session, lspServer, handlerOpts...)
 
 	// Create MCP server and register all gopls-mcp tools
-	server := mcp.NewServer(&mcp.Implementation{Name: mcpName, Version: mcpVersion}, nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: mcpName, Version: version}, nil)
 	core.RegisterTools(server, coreHandler)
 
 	log.Printf("[gopls-mcp] Registered %d MCP tools for Go analysis", 18)
@@ -227,332 +246,25 @@ func Execute() {
 	// Always exit cleanly - stdio mode ends when client closes connection
 }
 
-// minimalServer implements protocol.Server with only the methods used by core.
-// Most methods return "not implemented" errors, but Symbol is functional.
-type minimalServer struct {
-	session *cache.Session
-}
+func helpAndUsage() {
+	flag.Parse()
 
-// Symbol implements workspace symbol search using gopls's internal golang package.
-// This is the only method from protocol.Server that gopls-mcp handlers currently use.
-func (s *minimalServer) Symbol(ctx context.Context, params *protocol.WorkspaceSymbolParams) ([]protocol.SymbolInformation, error) {
-	// Collect ALL snapshots from ALL views
-	// This is critical for multi-module workspaces where each module has its own view
-	views := s.session.Views()
-	if len(views) == 0 {
-		return nil, fmt.Errorf("no active views")
+	// Handle help subcommand (e.g., "gopls-mcp help" or "gopls-mcp help <topic>")
+	args := flag.Args()
+	if len(args) > 0 && args[0] == "help" {
+		flag.Usage()
+		os.Exit(0)
 	}
 
-	snapshots := make([]*cache.Snapshot, 0, len(views))
-	releases := make([]func(), 0, len(views))
-
-	for _, view := range views {
-		snapshot, release, err := view.Snapshot()
-		if err != nil {
-			// Log but continue - skip views that can't produce snapshots
-			continue
-		}
-		snapshots = append(snapshots, snapshot)
-		releases = append(releases, release)
+	// Handle --version flag
+	if *showVersion {
+		fmt.Printf("gopls-mcp version %s\n", version)
+		os.Exit(0)
 	}
 
-	// Ensure all snapshots are released
-	defer func() {
-		for _, release := range releases {
-			release()
-		}
-	}()
-
-	if len(snapshots) == 0 {
-		return nil, fmt.Errorf("no valid snapshots available")
+	// Handle --help flag
+	if *showHelp {
+		flag.Usage()
+		os.Exit(0)
 	}
-
-	// Use gopls's internal symbol search
-	// Based on: gopls/internal/golang/workspace_symbol.go WorkspaceSymbols()
-	symbols, err := golang.WorkspaceSymbols(
-		ctx,
-		settings.SymbolFuzzy,
-		settings.DynamicSymbols,
-		snapshots,
-		params.Query,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search symbols: %w", err)
-	}
-
-	return symbols, nil
-}
-
-// All other protocol.Server methods return "not implemented" errors.
-// These are stubs to satisfy the interface but are not used by core.
-
-func (s *minimalServer) Progress(context.Context, *protocol.ProgressParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) SetTrace(context.Context, *protocol.SetTraceParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) IncomingCalls(context.Context, *protocol.CallHierarchyIncomingCallsParams) ([]protocol.CallHierarchyIncomingCall, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) OutgoingCalls(context.Context, *protocol.CallHierarchyOutgoingCallsParams) ([]protocol.CallHierarchyOutgoingCall, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ResolveCodeAction(context.Context, *protocol.CodeAction) (*protocol.CodeAction, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ResolveCodeLens(context.Context, *protocol.CodeLens) (*protocol.CodeLens, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ResolveCommand(context.Context, *protocol.ExecuteCommandParams) (*protocol.ExecuteCommandParams, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ResolveCompletionItem(context.Context, *protocol.CompletionItem) (*protocol.CompletionItem, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ResolveDocumentLink(context.Context, *protocol.DocumentLink) (*protocol.DocumentLink, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Exit(context.Context) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Initialize(context.Context, *protocol.ParamInitialize) (*protocol.InitializeResult, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Initialized(context.Context, *protocol.InitializedParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Resolve(context.Context, *protocol.InlayHint) (*protocol.InlayHint, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidChangeNotebookDocument(context.Context, *protocol.DidChangeNotebookDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidCloseNotebookDocument(context.Context, *protocol.DidCloseNotebookDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidOpenNotebookDocument(context.Context, *protocol.DidOpenNotebookDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidSaveNotebookDocument(context.Context, *protocol.DidSaveNotebookDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Shutdown(context.Context) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) CodeAction(context.Context, *protocol.CodeActionParams) ([]protocol.CodeAction, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) CodeLens(context.Context, *protocol.CodeLensParams) ([]protocol.CodeLens, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ColorPresentation(context.Context, *protocol.ColorPresentationParams) ([]protocol.ColorPresentation, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Completion(context.Context, *protocol.CompletionParams) (*protocol.CompletionList, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Declaration(context.Context, *protocol.DeclarationParams) (*protocol.Or_textDocument_declaration, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Definition(context.Context, *protocol.DefinitionParams) ([]protocol.Location, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Diagnostic(context.Context, *protocol.DocumentDiagnosticParams) (*protocol.DocumentDiagnosticReport, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidChange(context.Context, *protocol.DidChangeTextDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidClose(context.Context, *protocol.DidCloseTextDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidOpen(context.Context, *protocol.DidOpenTextDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidSave(context.Context, *protocol.DidSaveTextDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-
-// DidChangeWatchedFiles notifies gopls that files have changed on disk.
-// This is called by the file watcher when it detects filesystem changes.
-// It implements the LSP protocol to ensure proper cache invalidation.
-func (s *minimalServer) DidChangeWatchedFiles(ctx context.Context, params *protocol.DidChangeWatchedFilesParams) error {
-	if len(params.Changes) == 0 {
-		return nil
-	}
-
-	// Convert FileEvents to file.Modifications
-	// This is the core internal API that gopls uses to process file changes
-	modifications := s.fileEventsToModifications(params.Changes)
-
-	// Call gopls's internal API directly
-	// This handles all the cache invalidation, view updates, etc.
-	_, err := s.session.DidModifyFiles(ctx, modifications)
-	if err != nil {
-		return fmt.Errorf("failed to process file changes: %w", err)
-	}
-
-	return nil
-}
-
-// fileEventsToModifications converts LSP FileEvents to file.Modifications
-// This is the conversion that gopls uses internally when processing DidChangeWatchedFiles
-func (s *minimalServer) fileEventsToModifications(events []protocol.FileEvent) []file.Modification {
-	modifications := make([]file.Modification, 0, len(events))
-	for _, event := range events {
-		modifications = append(modifications, file.Modification{
-			URI:    event.URI,
-			Action: changeTypeToFileAction(event.Type),
-			OnDisk: true, // Important: marks this as an on-disk change (not editor change)
-		})
-	}
-	return modifications
-}
-
-// changeTypeToFileAction converts LSP FileChangeType to file.Action
-// Based on gopls/internal/server/text_synchronization.go
-func changeTypeToFileAction(ct protocol.FileChangeType) file.Action {
-	switch ct {
-	case protocol.Created:
-		return file.Create
-	case protocol.Changed:
-		return file.Change
-	case protocol.Deleted:
-		return file.Delete
-	default:
-		return file.Change
-	}
-}
-func (s *minimalServer) DocumentColor(context.Context, *protocol.DocumentColorParams) ([]protocol.ColorInformation, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DocumentHighlight(context.Context, *protocol.DocumentHighlightParams) ([]protocol.DocumentHighlight, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DocumentLink(context.Context, *protocol.DocumentLinkParams) ([]protocol.DocumentLink, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DocumentSymbol(context.Context, *protocol.DocumentSymbolParams) ([]any, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) FoldingRange(context.Context, *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Formatting(context.Context, *protocol.DocumentFormattingParams) ([]protocol.TextEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Hover(context.Context, *protocol.HoverParams) (*protocol.Hover, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Implementation(context.Context, *protocol.ImplementationParams) ([]protocol.Location, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) InlayHint(context.Context, *protocol.InlayHintParams) ([]protocol.InlayHint, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) InlineCompletion(context.Context, *protocol.InlineCompletionParams) (*protocol.Or_Result_textDocument_inlineCompletion, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) InlineValue(context.Context, *protocol.InlineValueParams) ([]protocol.InlineValue, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) LinkedEditingRange(context.Context, *protocol.LinkedEditingRangeParams) (*protocol.LinkedEditingRanges, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Moniker(context.Context, *protocol.MonikerParams) ([]protocol.Moniker, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) OnTypeFormatting(context.Context, *protocol.DocumentOnTypeFormattingParams) ([]protocol.TextEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) PrepareCallHierarchy(context.Context, *protocol.CallHierarchyPrepareParams) ([]protocol.CallHierarchyItem, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) PrepareRename(context.Context, *protocol.PrepareRenameParams) (*protocol.PrepareRenameResult, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) PrepareTypeHierarchy(context.Context, *protocol.TypeHierarchyPrepareParams) ([]protocol.TypeHierarchyItem, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) RangeFormatting(context.Context, *protocol.DocumentRangeFormattingParams) ([]protocol.TextEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) RangesFormatting(context.Context, *protocol.DocumentRangesFormattingParams) ([]protocol.TextEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) References(context.Context, *protocol.ReferenceParams) ([]protocol.Location, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Rename(context.Context, *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) SelectionRange(context.Context, *protocol.SelectionRangeParams) ([]protocol.SelectionRange, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) SemanticTokensFull(context.Context, *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) SemanticTokensFullDelta(context.Context, *protocol.SemanticTokensDeltaParams) (any, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) SemanticTokensRange(context.Context, *protocol.SemanticTokensRangeParams) (*protocol.SemanticTokens, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) SignatureHelp(context.Context, *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) TypeDefinition(context.Context, *protocol.TypeDefinitionParams) ([]protocol.Location, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) WillSave(context.Context, *protocol.WillSaveTextDocumentParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) WillSaveWaitUntil(context.Context, *protocol.WillSaveTextDocumentParams) ([]protocol.TextEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Subtypes(context.Context, *protocol.TypeHierarchySubtypesParams) ([]protocol.TypeHierarchyItem, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) Supertypes(context.Context, *protocol.TypeHierarchySupertypesParams) ([]protocol.TypeHierarchyItem, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) WorkDoneProgressCancel(context.Context, *protocol.WorkDoneProgressCancelParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DiagnosticWorkspace(context.Context, *protocol.WorkspaceDiagnosticParams) (*protocol.WorkspaceDiagnosticReport, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidChangeConfiguration(context.Context, *protocol.DidChangeConfigurationParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidChangeWorkspaceFolders(context.Context, *protocol.DidChangeWorkspaceFoldersParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidCreateFiles(context.Context, *protocol.CreateFilesParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidDeleteFiles(context.Context, *protocol.DeleteFilesParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) DidRenameFiles(context.Context, *protocol.RenameFilesParams) error {
-	return fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ExecuteCommand(context.Context, *protocol.ExecuteCommandParams) (any, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) TextDocumentContent(context.Context, *protocol.TextDocumentContentParams) (*protocol.TextDocumentContentResult, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) WillCreateFiles(context.Context, *protocol.CreateFilesParams) (*protocol.WorkspaceEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) WillDeleteFiles(context.Context, *protocol.DeleteFilesParams) (*protocol.WorkspaceEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) WillRenameFiles(context.Context, *protocol.RenameFilesParams) (*protocol.WorkspaceEdit, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-func (s *minimalServer) ResolveWorkspaceSymbol(context.Context, *protocol.WorkspaceSymbol) (*protocol.WorkspaceSymbol, error) {
-	return nil, fmt.Errorf("not implemented")
 }

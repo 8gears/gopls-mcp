@@ -114,8 +114,8 @@ func StartMCPServer(t *testing.T, workdir string) (*mcp.ClientSession, context.C
 }
 
 // StartSharedMCPServer builds and starts a gopls-mcp server with DYNAMIC VIEWS enabled.
-// TEST-ONLY: This enables the -allow-dynamic-views flag, which allows one gopls-mcp
-// process to create views for multiple test directories on-demand.
+// TEST-ONLY: This enables the GOPMCS_ALLOW_DYNAMIC_VIEWS environment variable, which allows
+// one gopls-mcp process to create views for multiple test directories on-demand.
 //
 // This is a performance optimization for e2e tests:
 // - Starts ONE gopls-mcp process for ALL tests (not one per test)
@@ -123,7 +123,7 @@ func StartMCPServer(t *testing.T, workdir string) (*mcp.ClientSession, context.C
 // - Each test gets its own view created on first access
 // - Reduces test time from ~197s to ~60s
 //
-// IMPORTANT: This is for TESTING ONLY. Normal users should NOT use this flag,
+// IMPORTANT: This is for TESTING ONLY. Normal users should NOT use this,
 // as it allows querying multiple unrelated projects which can lead to unexpected behavior.
 //
 // Usage pattern:
@@ -173,13 +173,11 @@ func StartSharedMCPServer(t *testing.T, sharedWorkdir string) (*mcp.ClientSessio
 		t.Fatalf("Failed to set executable permissions: %v", err)
 	}
 
-	// Start gopls-mcp with DYNAMIC VIEWS enabled (TEST-ONLY flag)
-	// The -allow-dynamic-views flag allows the server to create views on-demand
-	// for different test directories, sharing the gopls cache across all tests.
-	goplsMcpCmd := exec.Command(goplsMcpPath,
-		"-workdir", sharedWorkdir,
-		"-allow-dynamic-views", // TEST-ONLY: Enable dynamic view creation
-	)
+	// Start gopls-mcp with DYNAMIC VIEWS enabled (TEST-ONLY)
+	// The GOPMCS_ALLOW_DYNAMIC_VIEWS environment variable allows the server to create
+	// views on-demand for different test directories, sharing the gopls cache across all tests.
+	goplsMcpCmd := exec.Command(goplsMcpPath, "-workdir", sharedWorkdir)
+	goplsMcpCmd.Env = append(os.Environ(), "GOPMCS_ALLOW_DYNAMIC_VIEWS=true") // TEST-ONLY: Enable dynamic view creation
 
 	ctx, cancel := context.WithCancel(context.Background())
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v0.0.1"}, nil)
