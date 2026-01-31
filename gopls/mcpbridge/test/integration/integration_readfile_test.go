@@ -69,7 +69,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenReadFile)
+		content := testutil.ResultText(t, res, testutil.GoldenReadFileExisting)
 		t.Logf("File content:\n%s", content)
 
 		// Verify the content matches what we wrote
@@ -143,7 +143,7 @@ func main() {
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenReadFile)
+		content := testutil.ResultText(t, res, testutil.GoldenReadFileSpecialCharacters)
 		t.Logf("File content with special characters:\n%s", content)
 
 		// Verify special characters are preserved
@@ -207,7 +207,7 @@ func main() {
 
 		// Case 2: Tool returns a result - it should contain an error message
 		if res != nil {
-			content := testutil.ResultText(t, res, testutil.GoldenReadFile)
+			content := testutil.ResultText(t, res, testutil.GoldenReadFileNonExistent)
 
 			if !strings.Contains(content, "failed to get file content") {
 				// This is unexpected - the tool should have indicated an error somehow
@@ -271,7 +271,7 @@ go 1.21
 			t.Fatal("Expected non-nil result")
 		}
 
-		content := testutil.ResultText(t, res, testutil.GoldenReadFile)
+		content := testutil.ResultText(t, res, testutil.GoldenReadFileLarge)
 		t.Logf("Large file read (length: %d chars)", len(content))
 
 		// Verify we got the complete file

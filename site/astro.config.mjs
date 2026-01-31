@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { pluginCollapsibleSections } from '@expressive-code/plugin-collapsible-sections';
 
 export default defineConfig({
 	site: 'https://github.com/xieyuschen/gopls-mcp',
@@ -11,6 +12,13 @@ export default defineConfig({
 			social: [
 				{ label: 'GitHub', href: 'https://github.com/xieyuschen/gopls-mcp', icon: 'github' }
 			],
+
+            expressiveCode: {
+                themes: ['github-dark', 'github-light'],
+                 plugins: [
+                pluginCollapsibleSections(), 
+            ],
+            },
 			sidebar: [
 				{
 					label: 'Getting Started',

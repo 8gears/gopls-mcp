@@ -104,15 +104,21 @@ Check for compilation and type errors using incremental type checking.
 
 Find symbols (functions, types, constants) by name with fuzzy matching.
 
-**When to use**: You know part of a symbol name but not the full name or location.
+**When to use**: You know part of a symbol's NAME (identifier) but not the full name or location.
 
-**Use this instead of**: Grep/ripgrep for symbol searches.
+**Critical - This ONLY searches symbol names**:
+- ✅ Searches for identifier names: "formatSymbol", "Diag", "Server"
+- ❌ NOT for code patterns, phrases, or concepts
+- ❌ NOT for signatures like "func PackageDiagnostics"
+- ❌ NOT for descriptions like "diagnostic deduplicate logic"
+
+**Use this instead of**: Grep/ripgrep when searching for symbol identifiers by name.
 
 **Output**: Symbol name, kind, file, line. Does NOT include signature/docs/body (use go_definition for those).
 
 **Example**: Searching "formatSymbol" matches formatPackageSymbols, formatPackageSymbolDetail, FormatSymbolSummary.
 
-**See also**: go_definition for full details on a specific symbol.
+**See also**: go_definition for full details, go_list_package_symbols for exploring all symbols in a package.
 
 
 ### `go_symbol_references`

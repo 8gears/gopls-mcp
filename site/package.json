@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.37.4",
+    "@expressive-code/plugin-collapsible-sections": "^0.41.6",
     "astro": "^5.6.1",
     "remark": "^15.0.1",
     "remark-html": "^16.0.1"

@@ -77,7 +77,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Fatalf("Failed to search for test functions: %v", err)
 		}
 
-		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTests)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTestFunctions)
 		t.Logf("Test function search:\n%s", resultContent)
 
 		// Should find our test functions
@@ -145,7 +145,7 @@ func TestRealTestFiles_NavigateTestCode(t *testing.T) {
 			t.Fatalf("Failed to call go_definition: %v", err)
 		}
 
-		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTests)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTestDefinitions)
 		t.Logf("Test function definition:\n%s", resultContent)
 
 		// Should find the definition (it's in the same file)
@@ -268,7 +268,7 @@ func TestRealTestFiles_FindTestUsages(t *testing.T) {
 			t.Fatalf("Failed to search for globalSession: %v", err)
 		}
 
-		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchTests)
+		resultContent := testutil.ResultText(t, res, testutil.GoldenSearchCrossFile)
 		t.Logf("Search for globalSession across codebase:\n%s", testutil.TruncateString(resultContent, 2000))
 
 		// Should find usages in test files
