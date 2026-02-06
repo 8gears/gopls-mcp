@@ -189,7 +189,7 @@ func Execute() {
 			if err != nil {
 				return false
 			}
-			return !pathIncluded(rel)
+			return !pathIncluded(filepath.ToSlash(rel))
 		}))
 	}
 
