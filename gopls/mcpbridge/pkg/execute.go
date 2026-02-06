@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -57,6 +58,9 @@ var (
 	// logfile is the path to a log file for debugging (optional).
 	// When set, logs are written to this file even in stdio mode.
 	logfile = flag.String("logfile", "", "Path to log file for debugging (writes logs even in stdio mode)")
+	// directoryFiltersFlag allows setting gopls directoryFilters via CLI flag.
+	// Filters use the same syntax as gopls directoryFilters (e.g. "-**/node_modules,-vendor").
+	directoryFiltersFlag = flag.String("directory-filters", "", "Comma-separated directory filters (e.g. \"-**/node_modules,-vendor\")")
 )
 
 const (
@@ -122,6 +126,21 @@ func Execute() {
 	} else {
 		// Use default configuration
 		config = core.DefaultConfig()
+	}
+
+	// Merge CLI directory filters into config (overrides config file value)
+	if *directoryFiltersFlag != "" {
+		parts := strings.Split(*directoryFiltersFlag, ",")
+		// Convert to []any so opts.Set (which expects JSON-style types) accepts it
+		filters := make([]any, len(parts))
+		for i, p := range parts {
+			filters[i] = strings.TrimSpace(p)
+		}
+		if config.Gopls == nil {
+			config.Gopls = make(map[string]any)
+		}
+		config.Gopls["directoryFilters"] = filters
+		log.Printf("[gopls-mcp] Directory filters from CLI: %v", filters)
 	}
 
 	// Override workdir from config if set
