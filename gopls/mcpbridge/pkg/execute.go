@@ -177,20 +177,25 @@ func Execute() {
 	// The watcher uses DidChangeWatchedFiles to notify gopls of file changes
 	lspServer := &minimalServer{session: session}
 
+func makeDirectoryFilterSkipFunc(filters []string, root string) filewatcher.Option {
+	pathIncluded := cache.PathIncludeFunc(filters)
+	cleanRoot := filepath.Clean(root)
+	return filewatcher.WithSkipDir(func(dirPath string) bool {
+		rel, err := filepath.Rel(cleanRoot, dirPath)
+		if err != nil {
+			return false
+		}
+		rel = filepath.ToSlash(rel)
+		return !pathIncluded(rel)
+	})
+}
+
 	// Build directory skip function from directoryFilters so the file
 	// watcher excludes the same directories that gopls analysis ignores
 	// (e.g. node_modules). See https://github.com/xieyuschen/gopls-mcp/issues/10.
 	var watcherOpts []filewatcher.Option
 	if filters := options.DirectoryFilters; len(filters) > 0 {
-		pathIncluded := cache.PathIncludeFunc(filters)
-		root := filepath.Clean(projectDir)
-		watcherOpts = append(watcherOpts, filewatcher.WithSkipDir(func(dirPath string) bool {
-			rel, err := filepath.Rel(root, dirPath)
-			if err != nil {
-				return false
-			}
-			return !pathIncluded(filepath.ToSlash(rel))
-		}))
+		watcherOpts = append(watcherOpts, makeDirectoryFilterSkipFunc(filters, projectDir))
 	}
 
 	// Start file change watcher
